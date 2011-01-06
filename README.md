@@ -14,7 +14,7 @@ The easiest way to install is with [LuaRocks][3].
 
   - luarocks install https://github.com/ignacio/LuaNode-Socket.IO/raw/master/rockspecs/lnsocketio-github-1.rockspec
   
-You'll also need some Json library for Lua. [LuaJSON][4] or [Json4Lua][] are recommended.
+You'll also need some Json library for Lua. [LuaJSON][4] or [Json4Lua][5] are recommended.
 
   - luarocks install json4lua
   
