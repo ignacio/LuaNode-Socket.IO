@@ -24,7 +24,6 @@ build = {
 	type = "make",
 	build_pass = false,
 	variables = {
-		INCONCERT_DEVEL = "$(INCONCERT_DEVEL)",
 		LUA_LUADIR = "$(LUADIR)",
 		LUA_LIBDIR = "$(LIBDIR)",
 		LUA_PREFIX  = "$(PREFIX)"
