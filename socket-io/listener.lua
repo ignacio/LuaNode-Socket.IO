@@ -37,7 +37,7 @@ function Listener:__init (server, options)
 		flashPolicyServer = true,
 		transports = {'websocket', 'flashsocket', 'htmlfile', 'xhr-multipart', 'xhr-polling', 'jsonp-polling'},
 		transportOptions = {},
-		log = console.warn
+		log = console.log
 	}, options)
 	
 	if not newListener.options.log then
