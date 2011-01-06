@@ -1,6 +1,5 @@
 local Class = require "luanode.class"
 local Client = require "socket-io.client"
-local Stream = require "luanode.net".Stream
 local url = require "luanode.url"
 local crypto = require "luanode.crypto"
 local EventEmitter = require "luanode.event_emitter"
