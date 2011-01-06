@@ -12,17 +12,31 @@ v0.7pre clients. I'll add the other transports soon and eventually add support f
 ## Installation #
 The easiest way to install is with [LuaRocks][3].
 
-  - luarocks install full_url
+  - luarocks install https://github.com/ignacio/LuaNode-Socket.IO/raw/master/rockspecs/lnsocketio-github-1.rockspec
   
 You'll also need some Json library for Lua. [LuaJSON][4] or [Json4Lua][] are recommended.
 
   - luarocks install json4lua
+  
+And also:
 
+  - luarocks install luasocket
+  - luarocks install luuid
+  - luarocks install bitop
+  
+Also, LuaCrypto is needed, but the version [here](https://github.com/mkottman/luacrypto). You'll need CMake to build it 
+and then you need to copy the resulting library to Lua's path.
+
+
+  
 ## Documentation #
 The usage is the same as [Socket.IO-node][6].
 
 ## Example #
 See the included file `test.lua`. Once properly installed, you'd be able to do:
+
+    git clone git://github.com/ignacio/LuaNode-Socket.IO.git lnsocket-io
+    cd lnsocket-io/
     sudo luanode test.lua
 
 And then point your browser to `http://localhost:8080`.
