@@ -131,7 +131,7 @@ function WebSocket:_proveReception (headers)
 		local key2 = pack( math.floor(numkey2 / spaces2) )
 		
 		md5:update(key1):update(key2):update(self.upgradeHead)
-		self.connection:write(table.concat(headers, '\r\n') ..  "\r\n" .. "\r\n"..md5:final(nil, true))--, 'binary')
+		self.connection:write(table.concat(headers, '\r\n') ..  "\r\n" .. "\r\n"..md5:final("binary"))
 	end
 	
 	return true
