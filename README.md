@@ -6,8 +6,9 @@ Sockets for the rest of us (in [LuaNode][1]).
 not ready for prime-time yet.
 
 ## Status #
-Currently, the only transports implemented are *websockets* and *flashsockets*, and the server ir only compatible with 
-v0.7pre clients. I'll add the other transports soon and eventually add support for v0.6 clients.
+Currently, the only transports actively supported are *websockets* and *flashsockets*, and the server is only compatible with 
+v0.7pre clients. The other transports are disabled by default because they are a bit unstable at the moment. 
+I'll add proper support for them soon and eventually add support for v0.6 clients.
 
 ## Installation #
 The easiest way to install is with [LuaRocks][3].

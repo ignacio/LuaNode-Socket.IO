@@ -10,6 +10,8 @@ exports.options = {
 };
 --]]
 
+null_option = {}
+
 options = {
 	options = function(self, options, merge)
 		self.options = _M.merge(options or {}, merge or {})
@@ -18,7 +20,11 @@ options = {
 
 function merge(source, merge)
 	for k,v in pairs(merge) do
-		source[k] = v
+		if v == null_option then
+			source[k] = nil
+		else
+			source[k] = v
+		end
 	end
 	return source
 end

@@ -18,12 +18,15 @@ Client.__type = "socket-io.Client"
 function Client:__init (listener, req, res, options, head)
 	local newClient = Class.construct(Client)
 	newClient.listener = listener
-	newClient:options(merge({
-		ignoreEmptyOrigin = true,
-		timeout = 8000,
-		heartbeatInterval = 10000,
-		closeTimeout = 0
-	}, newClient.getOptions and newClient:getOptions() or {}), options)
+
+	-- since this refers to 'getOptions' and that is defined in a child class, I can't do this here
+	--newClient:options(merge({
+		--ignoreEmptyOrigin = true,
+		--timeout = 8000,
+		--heartbeatInterval = 10000,
+		--closeTimeout = 0
+	--}, newClient.getOptions and newClient:getOptions() or {}), options)
+		
 	newClient.connections = 0
 	newClient._open = false
 	newClient._heartbeats = 0
@@ -33,9 +36,22 @@ function Client:__init (listener, req, res, options, head)
 	newClient.decoder:on('data', function(self, ...)
 		newClient:_onMessage(...)
 	end)
-	--newClient:_onConnect(req, res)	-- lo hago arriba
+	
+	--newClient:_onConnect(req, res)	-- same cause as "getOptions".
+	-- the method afterConstruct will be called later
 	
 	return newClient
+end
+
+function Client:__afterConstruct (listener, req, res, options, head)
+	self:options(merge({
+		ignoreEmptyOrigin = true,
+		timeout = 8000,
+		heartbeatInterval = 10000,
+		closeTimeout = 0
+	}, self.getOptions and self:getOptions() or {}), options)
+	
+	self:_onConnect(req, res)
 end
 
 --

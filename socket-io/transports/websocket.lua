@@ -1,24 +1,23 @@
 local Class = require "luanode.class"
 local Client = require "socket-io.client"
+local Stream = require "luanode.net".Stream
 local url = require "luanode.url"
 local crypto = require "luanode.crypto"
 local EventEmitter = require "luanode.event_emitter"
 local bit = require "bit"
 local Utils = require "luanode.utils"
+local options = require "socket-io.utils".options
+local merge = require "socket-io.utils".merge
 
---[[
-WebSocket = module.exports = function(){
-  Client.apply(this, arguments);
-};
 
-require('sys').inherits(WebSocket, Client);
---]]
 WebSocket = Class.InheritsFrom(Client)
 WebSocket.__type = "socket-io.WebSocket"
 
-function WebSocket:__init (listener, ...)
-	local newClient = Class.construct(WebSocket, listener, ...)
-	newClient:_onConnect(...)	-- lo hago arriba
+function WebSocket:__init (...)
+	local newClient = Class.construct(WebSocket, ...)
+	
+	newClient:__afterConstruct(...)
+	
 	return newClient
 end
 

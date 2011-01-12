@@ -77,16 +77,17 @@ function Flashsocket.init (listener)
 			end
 		end)
 		
-		netserver:on("error", function(self, err)
-			if err == 13 then
-				listener.options.log([[Your LuaNode instance does not have root privileges.'
-This means that the flash XML policy file will be 
-served inline instead of on port 843. This will slow 
-connection time slightly]])
-			end
-			netserver = nil
-		end)
-		netserver:listen(843)
+		--try {
+			netserver:listen(843)
+		--} catch(e){
+			--if (e.errno == 13) {
+				--listener.options.log('Your node instance does not have root privileges.'
+					--		+ ' This means that the flash XML policy file will be'
+							--+ ' served inline instead of on port 843. This will slow'
+							--+ ' connection time slightly');
+			--}
+			--netserver = null;
+		--}
 	end
 	
 	-- Could not listen on port 843 so policy requests will be inline

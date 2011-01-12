@@ -15,7 +15,7 @@ local transports = {
 	--htmlfile = require("socket-io.transports.htmlfile"),
 	websocket = require("socket-io.transports.websocket"),
 	--["xhr-multipart"] = require("socket-io.transports.xhr-multipart"),
-	--["xhr-polling"] = require("socket-io.transports.xhr-polling"),
+	["xhr-polling"] = require("socket-io.transports.xhr-polling"),
 	--["jsonp-polling"] = require("socket-io.transports.jsonp-polling")
 }
 
@@ -106,28 +106,30 @@ end
 function Listener:check (req, res, httpUpgrade, head)
 	local path = url.parse(req.url).pathname
 	
-	if path and path:match('^/' .. self.options.resource) then
-		--console.warn("check:" .. path)
+	local function split_url(url)
 		local parts = {}
-		path:sub(2):gsub("([^/]+)", function(part)
+		url = (url or "") .. "/"
+		url:gsub("([^/]-)/", function(part)
 			parts[#parts + 1] = part
 		end)
+		return parts
+	end
+	
+	if path and path:match('^/' .. self.options.resource) then
+		--console.warn("check:" .. path)
+		local parts = split_url( path:sub(3 + #self.options.resource) )
 		local clone = {}
 		for k,v in pairs(parts) do clone[k] = v end
-		--console.debug("parts[1]=", parts[1])
-		--console.debug("parts[2]=", parts[2])
-		--console.debug("parts[3]=", parts[3])
-		table.remove(clone, 1)
 		if self:_serveClient(table.concat(clone, "/"), req, res) then
 			--console.warn("serveClient returned true")
 			return true
 		end
-		if not transports[parts[2]] then
-			console.warn("no transport for " .. parts[2]);
+		if not transports[parts[1]] then
+			console.warn("no transport for " .. parts[1])
 			return false
 		end
-		if parts[3] and parts[3] ~= "" then
-			local cn = self.clients[parts[3]]
+		if parts[2] and parts[2] ~= "" then
+			local cn = self.clients[parts[2]]
 			if cn then
 				cn:_onConnect(req, res)
 			else
@@ -136,7 +138,7 @@ function Listener:check (req, res, httpUpgrade, head)
 				self.options.log('Couldnt find client with session id "' .. parts[2] .. '"')
 			end
 		else
-			self:_onConnection(parts[2], req, res, httpUpgrade, head)
+			self:_onConnection(parts[1], req, res, httpUpgrade, head)
 		end
 		return true
 	end

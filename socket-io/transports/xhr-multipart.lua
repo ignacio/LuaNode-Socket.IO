@@ -1,34 +1,37 @@
 local Class = require "luanode.class"
 local Client = require "socket-io.client"
 local qs = require "luanode.querystring"
+local options = require "socket-io.utils".options
+local merge = require "socket-io.utils".merge
 
---Multipart = Client:new()
---Multipart = setmetatable({}, Client)
---Multipart.__index = Multipart
+--[[
+var Multipart = module.exports = function(){
+  Client.apply(this, arguments);
+};
 
+require('sys').inherits(Multipart, Client);
+--]]
 Multipart = Class.InheritsFrom(Client)
 Multipart.__type = "socket-io.Multipart"
 
---var Multipart = module.exports = function(){
---  Client.apply(this, arguments);
---};
-
---require('sys').inherits(Multipart, Client);
-
-function Multipart:__init (listener, ...)
-	local newClient = Class.Construct(Multipart, listener, ...)
-	newClient:_onConnect(...)	-- lo hago arriba
+function Multipart:__init (...)
+	local newClient = Class.construct(Multipart, ...)
+	
+	newClient:__afterConstruct(...)
+	
 	return newClient
 end
 
 function Multipart:_onConnect (req, res)
 	local body = ''
 	local headers = {}
+	
 	-- https://developer.mozilla.org/En/HTTP_Access_Control
 	if self:_verifyOrigin(req.headers.origin) then
 		headers['Access-Control-Allow-Origin'] = '*'
 		headers['Access-Control-Allow-Credentials'] = 'true'
 	end
+	
 	if req.headers['access-control-request-method'] then
 		-- CORS preflight message
 		headers['Access-Control-Allow-Methods'] = req.headers['access-control-request-method']
@@ -40,7 +43,7 @@ function Multipart:_onConnect (req, res)
 	
 	if req.method == "GET" then
 		Client._onConnect(self, req, res)
-		--Client.prototype._onConnect.apply(this, [req, res]);
+		
 		headers['Content-Type'] = 'multipart/x-mixed-replace;boundary="socketio"'
 		headers['Connection'] = 'keep-alive'
 		self.request.connection:addListener('end', function()
