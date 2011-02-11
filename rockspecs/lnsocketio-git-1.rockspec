@@ -14,7 +14,7 @@ LnSocketIO is a Socket.IO server written with LuaNode.
 	homepage = "http://git.inconcert/inconcert-6/lnsocket-io"
 }
 dependencies = {
-	"lua >= 5.1",
+	"lua >= 5.1", "luabitop"
 }
 
 external_dependencies = {
