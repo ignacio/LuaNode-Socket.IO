@@ -36,9 +36,11 @@ The usage is the same as [Socket.IO-node][6].
 ## Example #
 See the included file `test.lua`. Once properly installed, you'd be able to do:
 
-    git clone git://github.com/ignacio/LuaNode-Socket.IO.git lnsocket-io
-    cd lnsocket-io/
-    sudo luanode test.lua
+```bash
+git clone git://github.com/ignacio/LuaNode-Socket.IO.git lnsocket-io
+cd lnsocket-io/
+sudo luanode test.lua
+```
 
 And then point your browser to `http://localhost:8080`.
 
