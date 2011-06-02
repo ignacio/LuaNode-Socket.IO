@@ -14,7 +14,7 @@ LnSocketIO is a Socket.IO server written with LuaNode.
 	homepage = "https://github.com/ignacio/LuaNode-Socket.IO"
 }
 dependencies = {
-	"lua >= 5.1",
+	"lua >= 5.1", "luabitop"
 }
 
 external_dependencies = {
