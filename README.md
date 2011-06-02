@@ -2,12 +2,13 @@
 
 Sockets for the rest of us (in [LuaNode][1]).
 
-**LuaNode-Socket.IO** is a Socket.IO server for [LuaNode][1]. It's currently only compatible with [Socket.IO][2] v0.7pre, so it is 
-not ready for prime-time yet.
+**LuaNode-Socket.IO** is a Socket.IO server for [LuaNode][1]. It's currently only compatible with [Socket.IO][2] 
+v0.7pre, so it is not ready for prime-time yet.
 
 ## Status #
-Currently, the only transports actively supported are *websockets* and *flashsockets*, and the server is only compatible with 
-v0.7pre clients. The other transports are disabled by default because they are a bit unstable at the moment. 
+Currently, the only transports actively supported are *websockets*, *flashsockets*, *xhr-multipart* and *xhr-polling*, 
+and the server is only compatible with v0.7pre clients. The other transports are disabled by default because they are a 
+bit unstable at the moment. 
 I'll add proper support for them soon and eventually add support for v0.6 clients.
 
 ## Installation #
@@ -21,15 +22,9 @@ You'll also need some Json library for Lua. [LuaJSON][4] or [Json4Lua][5] are re
   
 And also:
 
-  - luarocks install luasocket
   - luarocks install luuid
   - luarocks install bitop
-  
-Also, LuaCrypto is needed, but the version [here](https://github.com/mkottman/luacrypto). You'll need CMake to build it 
-and then you need to copy the resulting library to Lua's path.
 
-
-  
 ## Documentation #
 The usage is the same as [Socket.IO-node][6].
 
