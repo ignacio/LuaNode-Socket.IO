@@ -14,7 +14,7 @@ local transports = {
 	flashsocket = require("socket-io.transports.flashsocket"),
 	--htmlfile = require("socket-io.transports.htmlfile"),
 	websocket = require("socket-io.transports.websocket"),
-	--["xhr-multipart"] = require("socket-io.transports.xhr-multipart"),
+	["xhr-multipart"] = require("socket-io.transports.xhr-multipart"),
 	["xhr-polling"] = require("socket-io.transports.xhr-polling"),
 	--["jsonp-polling"] = require("socket-io.transports.jsonp-polling")
 }
@@ -36,6 +36,7 @@ function Listener:__init (server, options)
 		resource = 'socket.io',
 		flashPolicyServer = true,
 		transports = {'websocket', 'flashsocket', 'htmlfile', 'xhr-multipart', 'xhr-polling', 'jsonp-polling'},
+		--transports = {'xhr-multipart', 'xhr-polling', 'jsonp-polling'},
 		transportOptions = {},
 		log = console.log
 	}, options)
@@ -45,6 +46,7 @@ function Listener:__init (server, options)
 	end
 
 	newListener.clients = {}
+	newListener.clientsIndex = {}
 	newListener._clientCount = 0
 	newListener._clientFiles = {}
 	newListener._realms = {}
@@ -69,22 +71,22 @@ function Listener:__init (server, options)
 		end
 		return false
 	end)
+	
 	for k, transport in pairs(transports) do
 		if type(transport.init) == "function" then
 			transport.init(newListener)
 		end
 	end
-  
+	
 	newListener.options.log('socket.io ready - accepting connections')
-		
+	
 	return newListener
 end
 
+--sys.inherits(Listener, process.EventEmitter)
 for k,v in pairs(options) do
 	Listener[k] = v
 end
---sys.inherits(Listener, process.EventEmitter)
---for (var i in options) Listener.prototype[i] = options[i]
 
 function Listener:broadcast (message, except, atts)
 	for k,client in pairs(self.clients) do
@@ -116,16 +118,14 @@ function Listener:check (req, res, httpUpgrade, head)
 	end
 	
 	if path and path:match('^/' .. self.options.resource) then
-		--console.warn("check:" .. path)
 		local parts = split_url( path:sub(3 + #self.options.resource) )
 		local clone = {}
 		for k,v in pairs(parts) do clone[k] = v end
 		if self:_serveClient(table.concat(clone, "/"), req, res) then
-			--console.warn("serveClient returned true")
 			return true
 		end
 		if not transports[parts[1]] then
-			console.warn("no transport for " .. parts[1])
+			self.options.log("no transport for " .. parts[1])
 			return false
 		end
 		if parts[2] and parts[2] ~= "" then
@@ -184,6 +184,9 @@ function Listener:_serveClient (file, req, res)
 					headers = {
 						['Content-Length'] = #data,
 						['Content-Type'] = types[ext],
+						-- yo agregue estos headers para que la ceibalita no se guarde los js en memoria
+						--["Pragma"] = "no-cache",
+						--["Cache-Control"] = "no-store, no-cache, must-revalidate",
 						ETag = clientVersion
 					},
 					content = data,
@@ -209,17 +212,23 @@ end
 
 function Listener:_onClientConnect (client)
 	self.clients[client.sessionId] = client
-	self.options.log('Client ' .. client.sessionId .. ' connected')
+	self.options.log('Client ' .. client.sessionId .. ' connected on ' .. os.date("%Y-%m-%d %H:%M:%S"))
+	self:emit('clientConnect', client)
 	self:emit('connection', client)
+end
+
+function Listener:_onClientMessage (data, client)
+	self:emit('clientMessage', data, client)
 end
 
 function Listener:_onClientDisconnect (client)
 	self.clients[client.sessionId] = nil
-	self.options.log('Client ' .. client.sessionId .. ' disconnected')
+	self.options.log('Client ' .. client.sessionId .. ' disconnected on ' .. os.date("%Y-%m-%d %H:%M:%S"))
+	self:emit('clientDisconnect', client)
 end
 
 function Listener:_onConnection (transport, req, res, httpUpgrade, head)
-	self.options.log('Initializing client with transport "' .. transport .. '"')
+	self.options.log('Initializing client with transport "' .. transport .. '" on ' .. os.date("%Y-%m-%d %H:%M:%S"))
 	transports[transport](self, req, res, self.options.transportOptions[transport], head)
 end
 

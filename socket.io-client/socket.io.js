@@ -1,55 +1,134 @@
+/*global window WEB_SOCKET_SWF_LOCATION jQuery
+*/
+
 /** Socket.IO 0.7pre - Built with build.js */
 /**
- * Socket.IO client
- * 
- * @author Guillermo Rauch <guillermo@learnboost.com>
- * @license The MIT license.
- * @copyright Copyright (c) 2010 LearnBoost <dev@learnboost.com>
+ * socket.io-node-client
+ * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
+ * MIT Licensed
  */
- 
-this.io = {
+
+/**
+ * @namespace
+ */
+var io = this.io = {
+	
+	/**
+   * Library version.
+   */
 	version: '0.7pre',
 	
+	/**
+   * Updates the location of the WebSocketMain.swf file that is required for the Flashsocket transport.
+   * This should only be needed if you want to load in the WebSocketMainInsecure.swf or if you want to
+   * host the .swf file on a other server.
+   *
+   * @static
+   * @deprecated Set the variable `WEB_SOCKET_SWF_LOCATION` pointing to WebSocketMain.swf
+   * @param {String} path The path of the .swf file
+   * @api public
+   */
 	setPath: function(path){
-		if (window.console && console.error) console.error('io.setPath will be removed. Please set the variable WEB_SOCKET_SWF_LOCATION pointing to WebSocketMain.swf');
+		if (window.console && console.error) { console.error('io.setPath will be removed. Please set the variable WEB_SOCKET_SWF_LOCATION pointing to WebSocketMain.swf'); }
 		this.path = /\/$/.test(path) ? path : path + '/';
-		WEB_SOCKET_SWF_LOCATION = path + 'lib/vendor/web-socket-js/WebSocketMain.swf';
+		window.WEB_SOCKET_SWF_LOCATION = path + 'lib/vendor/web-socket-js/WebSocketMain.swf';
 	}
 };
 
-if ('jQuery' in this) jQuery.io = this.io;
-
-if (typeof window != 'undefined'){
-  // WEB_SOCKET_SWF_LOCATION = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//cdn.socket.io/' + this.io.version + '/WebSocketMain.swf';
-  if (typeof WEB_SOCKET_SWF_LOCATION === 'undefined')
-    WEB_SOCKET_SWF_LOCATION = '/socket.io/lib/vendor/web-socket-js/WebSocketMain.swf';
-}
+/**
+ * Expose Socket.IO in jQuery
+ */
+if ('jQuery' in this) {jQuery.io = this.io;}
 
 /**
- * Socket.IO client
- * 
- * @author Guillermo Rauch <guillermo@learnboost.com>
- * @license The MIT license.
- * @copyright Copyright (c) 2010 LearnBoost <dev@learnboost.com>
+ * Default path to the .swf file.
+ */
+if (typeof window !== 'undefined'){
+  // WEB_SOCKET_SWF_LOCATION = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//cdn.socket.io/' + this.io.version + '/WebSocketMain.swf';
+  if (typeof WEB_SOCKET_SWF_LOCATION === 'undefined') {
+    window.WEB_SOCKET_SWF_LOCATION = '/socket.io/lib/vendor/web-socket-js/WebSocketMain.swf';
+	}
+}
+/**
+ * socket.io-node-client
+ * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
+ * MIT Licensed
  */
 
 (function(){
+	var io = this.io,
+	
+	/**
+   * Set when the `onload` event is executed on the page. This variable is used by
+   * `io.util.load` to detect if we need to execute the function immediately or add
+   * it to a onload listener.
+   *
+   * @type {Boolean}
+   * @api private
+   */
+	pageLoaded = false;
 
-	var _pageLoaded = false;
-
+	/**
+   * @namespace
+   */
 	io.util = {
-
-		ios: false,
-
+	/**
+     * Executes the given function when the page is loaded.
+     *
+     * Example:
+     *
+     *     io.util.load(function(){ console.log('page loaded') });
+     *
+     * @param {Function} fn
+     * @api public
+     */
 		load: function(fn){
-			if (document.readyState == 'complete' || _pageLoaded) return fn();
+			if (/loaded|complete/.test(document.readyState) || pageLoaded) {return fn();}
 			if ('attachEvent' in window){
 				window.attachEvent('onload', fn);
 			} else {
 				window.addEventListener('load', fn, false);
 			}
 		},
-
+		
+		/**
+     * Defers the function untill it's the function can be executed without
+     * blocking the load process. This is especially needed for WebKit based
+     * browsers. If a long running connection is made before the onload event
+     * a loading indicator spinner will be present at all times untill a
+     * reconnect has been made.
+     *
+     * @param {Function} fn
+     * @api public
+     */
+    defer: function(fn){
+      if (!io.util.webkit) {return fn();}
+      io.util.load(function(){
+        setTimeout(fn,100);
+      });
+    },
+	
+	/**
+     * Inherit the prototype methods from one constructor into another.
+     *
+     * Example:
+     *
+     *     function foo(){};
+     *     foo.prototype.hello = function(){ console.log( this.words )};
+     *     
+     *     function bar(){
+     *       this.words = "Hello world";
+     *     };
+     *     
+     *     io.util.inherit(bar,foo);
+     *     var person = new bar();
+     *     person.hello();
+     *     // => "Hello World"
+     *
+     * @param {Constructor} ctor The constructor that needs to inherit the methods.
+     * @param {Constructor} superCtor The constructor to inherit from.
+     * @api public
+     */
 		inherit: function(ctor, superCtor){
 			// no support for `instanceof` for now
 			for (var i in superCtor.prototype){
@@ -57,44 +136,97 @@ if (typeof window != 'undefined'){
 			}
 		},
 
+		/**
+     * Finds the index of item in a given Array.
+     *
+     * Example:
+     *
+     *     var data = ['socket',2,3,4,'socket',5,6,7,'io'];
+     *     io.util.indexOf(data,'socket',1);
+     *     // => 4
+     *
+     * @param {Array} arr The array
+     * @param item The item that we need to find
+     * @param {Integer} from Starting point
+     * @api public
+     */
 		indexOf: function(arr, item, from){
 			for (var l = arr.length, i = (from < 0) ? Math.max(0, l + from) : from || 0; i < l; i++){
-				if (arr[i] === item) return i;
+				if (arr[i] === item) {return i;}
 			}
 			return -1;
 		},
 
-		isArray: function(obj){
-			return Object.prototype.toString.call(obj) === '[object Array]';
-		},
+		/**
+     * Checks if the given object is an Array.
+     *
+     * Example:
+     *
+     *     io.util.isArray([]);
+     *     // => true
+     *     io.util.isArray({});
+     *    // => false
+     *
+     * @param obj
+     * @api public
+     */
+    isArray: function(obj){
+      return Object.prototype.toString.call(obj) === '[object Array]';
+    },
 		
+		/**
+     * Merges the properties of two objects.
+     *
+     * Example:
+     *
+     *     var a = {foo:'bar'}
+     *       , b = {bar:'baz'};
+     *     
+     *     io.util.merge(a,b);
+     *     // => {foo:'bar',bar:'baz'}
+     *
+     * @param {Object} target The object that receives the keys
+     * @param {Object} additional The object that supplies the keys
+     * @api public
+     */
     merge: function(target, additional){
-      for (var i in additional)
-        if (additional.hasOwnProperty(i))
+      for (var i in additional) {
+        if (additional.hasOwnProperty(i)) {
           target[i] = additional[i];
+		  }
+		}
     }
-
 	};
 
-	io.util.ios = /iphone|ipad/i.test(navigator.userAgent);
-	io.util.android = /android/i.test(navigator.userAgent);
-	io.util.opera = /opera/i.test(navigator.userAgent);
+	/**
+   * Detect the Webkit platform based on the userAgent string.
+   * This includes Mobile Webkit.
+   *
+   * @type {Boolean}
+   * @api public
+   */
+	io.util.webkit = /webkit/i.test(navigator.userAgent);
 
 	io.util.load(function(){
-		_pageLoaded = true;
+		pageLoaded = true;
 	});
 
 })();
-
 /**
- * Socket.IO client
- * 
- * @author Guillermo Rauch <guillermo@learnboost.com>
- * @license The MIT license.
- * @copyright Copyright (c) 2010 LearnBoost <dev@learnboost.com>
+ * socket.io-node-client
+ * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
+ * MIT Licensed
  */
 
-io.data = {};
+/*(function(){
+	var io = this.io;*/
+	
+ /**
+   * IO namespace.
+   *
+   * @namespace
+   */
+	io.data = {};
 
 /**
  * Data decoder class
@@ -130,7 +262,7 @@ io.data.Decoder.prototype = {
     for (var l = this.buffer.length; this.i < l; this.i++){
 	  var chr = this.buffer.charAt(this.i);
       if (this.type === undefined){
-        if (chr == ':') return this.error('Data type not specified');
+        if (chr === ':') return this.error('Data type not specified');
         this.type = '' + chr;
         continue;
       }
@@ -319,6 +451,8 @@ io.data.decodeMessage = function(msg){
   return [data, anns];
 };
 
+//})();
+
 /**
  * Socket.IO client
  * 
@@ -331,36 +465,99 @@ io.data.decodeMessage = function(msg){
 
 (function(){
 	
+	/**
+   * This is the transport template for all supported transport methods. It provides the
+   * basic functionality to create a working transport for Socket.IO.
+   *
+   * Options:
+   *   - `timeout`  Transport shutdown timeout in milliseconds, based on the heartbeat interval.
+   *
+   * Example:
+   *
+   *     var transport = io.Transport.mytransport = function(){
+   *       io.Transport.apply(this, arguments);
+   *     };
+   *     io.util.inherit(transport, io.Transport);
+   *     
+   *     ... // more code here
+   *     
+   *     // connect with your new transport
+   *     var socket = new io.Socket(null,{transports:['mytransport']});
+   *
+   * @constructor
+   * @param {Object} base The reference to io.Socket.
+   * @param {Object} options The transport options.
+   * @property {io.Socket|Object} base The reference to io.Socket.
+   * @property {Object} options The transport options, these are used to overwrite the default options
+   * @property {String} sessionid The sessionid of the established connection, this is only available a connection is established
+   * @property {Boolean} connected The connection has been established.
+   * @property {Boolean} connecting We are still connecting to the server.
+   * @api public
+   */
 	Transport = io.Transport = function(base, options){
-    var self = this;
+		var self = this;
 		this.base = base;
 		this.options = {
 			timeout: 15000 // based on heartbeat interval default
 		};
 		io.util.merge(this.options, options);
-    this._decoder = new io.data.Decoder();
-    this._decoder.on('data', function(type, message){
-      self._onMessage(type, message);
-    });
+		this._decoder = new io.data.Decoder();
+		this._decoder.on('data', function(type, message){
+			self._onMessage(type, message);
+		});
 	};
 
+	  /**
+   * Send the message to the connected Socket.IO server.
+   *
+   * @throws {Error} When the io.Transport is inherited, it should override this method.
+   * @api public
+   */
 	Transport.prototype.write = function(){
 		throw new Error('Missing write() implementation');
 	};
 
+	/**
+   * Establish a connection with the Socket.IO server..
+   *
+   * @throws {Error} When the io.Transport is inherited, it should override this method.
+   * @api public
+   */
 	Transport.prototype.connect = function(){
 		throw new Error('Missing connect() implementation');
 	};
 
+	/**
+   * Disconnect the established connection.
+   *
+   * @throws {Error} When the io.Transport is inherited, it should override this method.
+   * @api private
+   */
 	Transport.prototype.disconnect = function(){
 		throw new Error('Missing disconnect() implementation');
 	};
 	
+	/**
+   * Handles the response from the server. When a new response is received
+   * it will automatically update the timeout, decode the message and
+   * forwards the response to the onMessage function for further processing.
+   *
+   * @param {String} data Response from the server.
+   * @api private
+   */
 	Transport.prototype._onData = function(data){
 		this._setTimeout();
 		this._decoder.add(data);
 	};
 	
+	/**
+   * All the transports have a dedicated timeout to detect if
+   * the connection is still alive. We clear the existing timer
+   * and set new one each time this function is called. When the
+   * timeout does occur it will call the `onTimeout` method.
+   *
+   * @api private
+   */
 	Transport.prototype._setTimeout = function(){
 		var self = this;
 		if (this._timeout) clearTimeout(this._timeout);
@@ -369,6 +566,11 @@ io.data.decodeMessage = function(msg){
 		}, this.options.timeout);
 	};
 	
+	/**
+   * Disconnect from the Socket.IO server when a timeout occurs.
+   * 
+   * @api private
+   */
 	Transport.prototype._onTimeout = function(){
 		this._onDisconnect();
 	};
@@ -402,10 +604,23 @@ io.data.decodeMessage = function(msg){
     }
 	},
 	
+	/**
+   * Send the received heartbeat message back to server. So the server
+   * knows we are still connected.
+   *
+   * @param {String} heartbeat Heartbeat response from the server.
+   * @api private
+   */
 	Transport.prototype._onHeartbeat = function(heartbeat){
 		this.write('2', heartbeat); // echo
 	};
 	
+	/**
+   * Notifies the base when a connection to the Socket.IO server has
+   * been established. And it starts the connection `timeout` timer.
+   *
+   * @api private
+   */
 	Transport.prototype._onConnect = function(){
 		this.connected = true;
 		this.connecting = false;
@@ -413,6 +628,12 @@ io.data.decodeMessage = function(msg){
 		this._setTimeout();
 	};
 
+	/**
+   * Notifies the base when the connection with the Socket.IO server
+   * has been disconnected.
+   *
+   * @api private
+   */
 	Transport.prototype._onDisconnect = function(){
 		this.connecting = false;
 		this.connected = false;
@@ -420,6 +641,13 @@ io.data.decodeMessage = function(msg){
 		this.base._onDisconnect();
 	};
 
+	/**
+   * Generates a connection url based on the Socket.IO URL Protocol.
+   * See <https://github.com/learnboost/socket.io-node/> for more details.
+   *
+   * @returns {String} Connection url
+   * @api private
+   */
 	Transport.prototype._prepareUrl = function(){
 		return (this.base.options.secure ? 'https' : 'http') 
 			+ '://' + this.base.host 
@@ -440,9 +668,23 @@ io.data.decodeMessage = function(msg){
  */
 
 (function(){
+	var io = this.io,
 	
-	var empty = new Function,
-	    
+	/**
+   * A small stub function that will be used to reduce memory leaks.
+   *
+   * @type {Function}
+   * @api private
+   */
+	empty = new Function,
+	 
+/**
+   * We preform a small feature detection to see if `Cross Origin Resource Sharing`
+   * is supported in the `XMLHttpRequest` object, so we can use it for cross domain requests.
+   *
+   * @type {Boolean}
+   * @api private
+   */ 	 
 	XMLHttpRequestCORS = (function(){
 		if (!('XMLHttpRequest' in window)) return false;
 		// CORS feature detection
@@ -450,6 +692,13 @@ io.data.decodeMessage = function(msg){
 		return a.withCredentials != undefined;
 	})(),
 	
+	/**
+   * Generates the correct `XMLHttpRequest` for regular and cross domain requests.
+   *
+   * @param {Boolean} [xdomain] Create a request that can be used cross domain.
+   * @returns {XMLHttpRequest|false} If we can create a XMLHttpRequest we will return that.
+   * @api private
+   */
 	request = function(xdomain){
 		if ('XDomainRequest' in window && xdomain) return new XDomainRequest();
 		if ('XMLHttpRequest' in window && (!xdomain || XMLHttpRequestCORS)) return new XMLHttpRequest();
@@ -467,6 +716,15 @@ io.data.decodeMessage = function(msg){
 		return false;
 	},
 	
+	/**
+   * This is the base for XHR based transports, the `XHR-Polling` and the `XHR-multipart` 
+   * transports will extend this class.
+   *
+   * @constructor
+   * @extends {io.Transport}
+   * @property {Array} sendBuffer Used to queue up messages so they can be send as one request.
+   * @api public
+   */
 	XHR = io.Transport.XHR = function(){
 		io.Transport.apply(this, arguments);
 		this._sendBuffer = [];
@@ -474,11 +732,23 @@ io.data.decodeMessage = function(msg){
 	
 	io.util.inherit(XHR, io.Transport);
 	
+	/**
+   * Establish a connection
+   *
+   * @returns {Transport}
+   * @api public
+   */
 	XHR.prototype.connect = function(){
 		this._get();
 		return this;
 	};
 	
+	/**
+   * Check if we need to send data to the Socket.IO server, if we have data in our buffer
+   * we encode it and forward it to the sendIORequest method.
+   *
+   * @api private
+   */
 	XHR.prototype._checkSend = function(){
 		if (!this._posting && this._sendBuffer.length){
 			var encoded = io.data.encode(this._sendBuffer);
@@ -487,15 +757,29 @@ io.data.decodeMessage = function(msg){
 		}
 	};
 	
+	/**
+   * Send data to the Socket.IO server.
+   *
+   * @param data The message
+   * @returns {Transport}
+   * @api public
+   */
 	XHR.prototype.write = function(type, data){
-    if (io.util.isArray(type))
-      this._sendBuffer.push.apply(this._sendBuffer, type);
-    else
-      this._sendBuffer.push([type, data]);
+		if (io.util.isArray(type)) {
+			this._sendBuffer.push.apply(this._sendBuffer, type);
+		} else {
+			this._sendBuffer.push([type, data]);
+		}
 		this._checkSend();
 		return this;
 	};
 	
+	/**
+   * Posts a encoded message to the Socket.IO server.
+   *
+   * @param {String} data A encoded message.
+   * @api private
+   */
 	XHR.prototype._send = function(data){
 		var self = this;
 		this._posting = true;
@@ -516,27 +800,51 @@ io.data.decodeMessage = function(msg){
 		this._sendXhr.send('data=' + encodeURIComponent(data));
 	};
 	
+	/**
+   * Disconnect the established connection.
+   *
+   * @returns {Transport}.
+   * @api public
+   */
 	XHR.prototype.disconnect = function(){
 		// send disconnection signal
 		this._onDisconnect();
 		return this;
 	};
 	
+	/**
+   * Handle the disconnect request.
+   *
+   * @api private
+   */
 	XHR.prototype._onDisconnect = function(){
 		if (this._xhr){
-			this._xhr.onreadystatechange = this._xhr.onload = empty;
-			this._xhr.abort();
+			this._xhr.onreadystatechange = empty;
+			try {
+				this._xhr.abort();
+			} catch(e) {};
 			this._xhr = null;
 		}
 		if (this._sendXhr){
-			this._sendXhr.onreadystatechange = this._sendXhr.onload = empty;
-			this._sendXhr.abort();
+			this._sendXhr.onreadystatechange = empty;
+			try {
+				this._sendXhr.abort();
+			} catch(e) {};
 			this._sendXhr = null;
 		}
 		this._sendBuffer = [];
 		io.Transport.prototype._onDisconnect.call(this);
 	};
 	
+	 /**
+   * Generates a configured XHR request
+   *
+   * @param {String} url The url that needs to be requested.
+   * @param {String} method The method the request should use.
+   * @param {Boolean} multipart Do a multipart XHR request
+   * @returns {XMLHttpRequest}
+   * @api private
+   */
 	XHR.prototype._request = function(url, method, multipart){
 		var req = request(this.base._isXDomain());
 		if (multipart) req.multipart = true;
@@ -547,6 +855,13 @@ io.data.decodeMessage = function(msg){
 		return req;
 	};
 	
+	/**
+   * Check if the XHR transports are supported
+   *
+   * @param {Boolean} xdomain Check if we support cross domain requests.
+   * @returns {Boolean}
+   * @api public
+   */
 	XHR.check = function(xdomain){
 		try {
 			if (request(xdomain)) return true;
@@ -571,40 +886,89 @@ io.data.decodeMessage = function(msg){
  */
 
 (function(){
+	var io = this.io,
 	
-	var WS = io.Transport.websocket = function(){
+	/**
+   * The WebSocket transport uses the HTML5 WebSocket API to establish an persistent
+   * connection with the Socket.IO server. This transport will also be inherited by the
+   * FlashSocket fallback as it provides a API compatible polyfill for the WebSockets.
+   *
+   * @constructor
+   * @extends {io.Transport}
+   * @api public
+   */
+	WS = io.Transport.websocket = function(){
 		io.Transport.apply(this, arguments);
 	};
 	
 	io.util.inherit(WS, io.Transport);
 	
+	/**
+   * The transport type, you use this to identify which transport was chosen.
+   *
+   * @type {String}
+   * @api public
+   */
 	WS.prototype.type = 'websocket';
 	
+	/**
+   * Initializes a new `WebSocket` connection with the Socket.IO server. We attach
+   * all the appropriate listeners to handle the responses from the server.
+   *
+   * @returns {Transport}
+   * @api public
+   */
 	WS.prototype.connect = function(){
 		var self = this;
 		this.socket = new WebSocket(this._prepareUrl());
 		this.socket.onmessage = function(ev){ self._onData(ev.data); };
-		this.socket.onclose = function(ev){ self._onClose(); };
+		this.socket.onclose = function(ev){ self._onDisconnect(); };
+		this.socket.onerror = function(e){ self.onError(e); };
 		return this;
 	};
 	
+	/**
+   * Send a message to the Socket.IO server. The message will automatically be encoded
+   * in the correct message format.
+   *
+   * @returns {Transport}
+   * @api public
+   */
 	WS.prototype.write = function(type, data){
 		if (this.socket)
-      this.socket.send(io.data.encode(io.util.isArray(type) ? type : [type, data]));
+			this.socket.send(io.data.encode(io.util.isArray(type) ? type : [type, data]));
 		return this;
 	};
 	
+	/**
+   * Disconnect the established `WebSocket` connection.
+   *
+   * @returns {Transport}
+   * @api public
+   */
 	WS.prototype.disconnect = function(){
 		if (this.socket) this.socket.close();
-    this._onDisconnect();
 		return this;
 	};
 	
-	WS.prototype._onClose = function(){
-		this._onDisconnect();
-		return this;
+	/**
+   * Handle the errors that `WebSocket` might be giving when we
+   * are attempting to connect or send messages.
+   *
+   * @param {Error} e The error.
+   * @api private
+   */
+	WS.prototype.onError = function(e){
+		this.base.emit('error', [e]);
 	};
 	
+	/**
+   * Generate a `WebSocket` compatible URL based on the options
+   * the user supplied in our Socket.IO base.
+   *
+   * @returns {String} Connection url
+   * @api private
+   */
 	WS.prototype._prepareUrl = function(){
 		return (this.base.options.secure ? 'wss' : 'ws') 
 		+ '://' + this.base.host 
@@ -614,11 +978,24 @@ io.data.decodeMessage = function(msg){
 		+ (this.sessionid ? ('/' + this.sessionid) : '');
 	};
 	
+	/**
+   * Checks if the browser has support for native `WebSockets` and that
+   * it's not the polyfill created for the FlashSocket transport.
+   *
+   * @return {Boolean}
+   * @api public
+   */
 	WS.check = function(){
 		// we make sure WebSocket is not confounded with a previously loaded flash WebSocket
 		return 'WebSocket' in window && WebSocket.prototype && ( WebSocket.prototype.send && !!WebSocket.prototype.send.toString().match(/native/i)) && typeof WebSocket !== "undefined";
 	};
 
+	/**
+   * Check if the `WebSocket` transport support cross domain communications.
+   *
+   * @returns {Boolean}
+   * @api public
+   */
 	WS.xdomainCheck = function(){
 		return true;
 	};
@@ -634,15 +1011,39 @@ io.data.decodeMessage = function(msg){
  */
 
 (function(){
+	var io = this.io,
 	
-	var Flashsocket = io.Transport.flashsocket = function(){
+	/**
+   * The Flashsocket transport. This is a API wrapper for the HTML5 WebSocket specification.
+   * It uses a .swf file to communicate with the server. If you want to serve the .swf file
+   * from a other server than where the Socket.IO script is coming from you need to use the
+   * insecure version of the .swf. More information about this can be found on the github page.
+   *
+   * @constructor
+   * @extends {io.Transport.websocket}
+   * @api public
+   */
+	Flashsocket = io.Transport.flashsocket = function(){
 		io.Transport.websocket.apply(this, arguments);
 	};
 	
 	io.util.inherit(Flashsocket, io.Transport.websocket);
 	
+	/**
+   * The transport type, you use this to identify which transport was chosen.
+   *
+   * @type {String}
+   * @api public
+   */
 	Flashsocket.prototype.type = 'flashsocket';
 	
+	/**
+   * Disconnect the established `Flashsocket` connection. This is done by adding a new
+   * task to the Flashsocket. The rest will be handled off by the `WebSocket` transport.
+   *
+   * @returns {Transport}
+   * @api public
+   */
 	Flashsocket.prototype.connect = function(){
 		var self = this, args = arguments;
 		WebSocket.__addTask(function(){
@@ -651,6 +1052,13 @@ io.data.decodeMessage = function(msg){
 		return this;
 	};
 	
+	/**
+   * Sends a message to the Socket.IO server. This is done by adding a new
+   * task to the Flashsocket. The rest will be handled off by the `WebSocket` transport.
+   *
+   * @returns {Transport}
+   * @api public
+   */
 	Flashsocket.prototype.send = function(){
 		var self = this, args = arguments;
 		WebSocket.__addTask(function(){
@@ -659,20 +1067,26 @@ io.data.decodeMessage = function(msg){
 		return this;
 	};
 	
+	/**
+   * Check if the Flashsocket transport is supported as it requires that the Adobe Flash Player
+   * plugin version `10.0.0` or greater is installed. And also check if the polyfill is correctly
+   * loaded.
+   *
+   * @returns {Boolean}
+   * @api public
+   */
 	Flashsocket.check = function(){
 		if (typeof WebSocket == 'undefined' || !('__addTask' in WebSocket)) return false;
-		if (io.util.opera) return false; // opera is buggy with this transport
-		if ('navigator' in window && 'plugins' in navigator && navigator.plugins['Shockwave Flash']){
-			return !!navigator.plugins['Shockwave Flash'].description;
-	  }
-		if ('ActiveXObject' in window) {
-			try {
-				return !!new ActiveXObject('ShockwaveFlash.ShockwaveFlash').GetVariable('$version');
-			} catch (e) {}
-		}
-		return false;
+		return swfobject.hasFlashPlayerVersion("10.0.0");
 	};
 	
+	/**
+   * Check if the Flashsocket transport can be used as cross domain / cross origin transport.
+   * Because we can't see which type (secure or insecure) of .swf is used we will just return true.
+   *
+   * @returns {Boolean}
+   * @api public
+   */
 	Flashsocket.xdomainCheck = function(){
 		return true;
 	};
@@ -687,21 +1101,51 @@ io.data.decodeMessage = function(msg){
  */
 
 (function(){
+	var io = this.io,
 	
-	var HTMLFile = io.Transport.htmlfile = function(){
+	/**
+   * The HTMLFile transport creates a `forever iframe` based transport
+   * for Internet Explorer. Regular forever iframe implementations will 
+   * continuously trigger the browsers buzy indicators. If the forever iframe
+   * is created inside a `htmlfile` these indicators will not be trigged.
+   *
+   * @constructor
+   * @extends {io.Transport.XHR}
+   * @api public
+   */
+	HTMLFile = io.Transport.htmlfile = function(){
 		io.Transport.XHR.apply(this, arguments);
 	};
 	
 	io.util.inherit(HTMLFile, io.Transport.XHR);
 	
+	/**
+   * The transport type, you use this to identify which transport was chosen.
+   *
+   * @type {String}
+   * @api public
+   */
 	HTMLFile.prototype.type = 'htmlfile';
 	
+	/**
+   * Starts the HTMLFile data stream for incoming messages. And registers a
+   * onunload event listener so the HTMLFile will be destroyed.
+   *
+   * @api private
+   */
 	HTMLFile.prototype._get = function(){
 		var self = this;
 		this._open();
 		window.attachEvent('onunload', function(){ self._destroy(); });
 	};
 	
+	/**
+   * Creates a new ActiveX `htmlfile` with a forever loading iframe
+   * that can be used to listen to messages. Inside the generated
+   * `htmlfile` a reference will be made to the HTMLFile transport.
+   *
+   * @api private
+   */
 	HTMLFile.prototype._open = function(){
 		this._doc = new ActiveXObject('htmlfile');
 		this._doc.open();
@@ -716,25 +1160,56 @@ io.data.decodeMessage = function(msg){
 		this._iframe.src = this._prepareUrl() + '/' + (+ new Date);
 	};
 	
+	/**
+   * The Socket.IO server will write script tags inside the forever
+   * iframe, this function will be used as callback for the incoming
+   * information.
+   *
+   * @param {String} data The message
+   * @param {document} doc Reference to the context
+   * @api private
+   */
 	HTMLFile.prototype._ = function(data, doc){
 		this._onData(data);
 		var script = doc.getElementsByTagName('script')[0];
 		script.parentNode.removeChild(script);
 	};
 
-  HTMLFile.prototype._destroy = function(){
-    if (this._iframe){
-      this._iframe.src = 'about:blank';
-      this._doc = null;
-      CollectGarbage();
-    }
-  };
+	/**
+   * Destroy the established connection, iframe and `htmlfile`.
+   * And calls the `CollectGarbage` function of Internet Explorer
+   * to release the memory.
+   *
+   * @api private
+   */
+	HTMLFile.prototype._destroy = function(){
+		if (this._iframe){
+			try {
+				this._iframe.src = 'about:blank';
+			} catch(e) {};
+			this._doc = null;
+		CollectGarbage();
+		}
+	};
 	
+	/**
+   * Disconnects the established connection.
+   *
+   * @returns {Transport} Chaining.
+   * @api public
+   */
 	HTMLFile.prototype.disconnect = function(){
 		this._destroy();
 		return io.Transport.XHR.prototype.disconnect.call(this);
 	};
 	
+	/**
+   * Checks if the browser supports this transport. The browser
+   * must have an `ActiveXObject` implementation.
+   *
+   * @return {Boolean}
+   * @api public
+   */
 	HTMLFile.check = function(){
 		if ('ActiveXObject' in window){
 			try {
@@ -745,6 +1220,12 @@ io.data.decodeMessage = function(msg){
 		return false;
 	};
 
+	/**
+   * Check if cross domain requests are supported.
+   *
+   * @returns {Boolean}
+   * @api public
+   */
 	HTMLFile.xdomainCheck = function(){
 		// we can probably do handling for sub-domains, we should test that it's cross domain but a subdomain here
 		return false;
@@ -760,28 +1241,60 @@ io.data.decodeMessage = function(msg){
  */
 
 (function(){
+	var io = this.io,
 	
-	var XHRMultipart = io.Transport['xhr-multipart'] = function(){
+	/**
+   * The XHR-Multipart transport uses the a multipart XHR connection to
+   * stream in the data from the Socket.IO server
+   *
+   * @constructor
+   * @extends {io.Transport.XHR}
+   * @api public
+   */
+	XHRMultipart = io.Transport['xhr-multipart'] = function(){
 		io.Transport.XHR.apply(this, arguments);
 	};
 	
 	io.util.inherit(XHRMultipart, io.Transport.XHR);
 	
+	/**
+   * The transport type, you use this to identify which transport was chosen.
+   *
+   * @type {String}
+   * @api public
+   */
 	XHRMultipart.prototype.type = 'xhr-multipart';
 	
+	/**
+   * Starts the multipart stream for incomming messages.
+   *
+   * @api private
+   */
 	XHRMultipart.prototype._get = function(){
 		var self = this;
 		this._xhr = this._request('', 'GET', true);
 		this._xhr.onreadystatechange = function(){
-			if (self._xhr.readyState == 3) self._onData(self._xhr.responseText);
+			if (self._xhr.readyState == 4) self._onData(self._xhr.responseText);
 		};
-		this._xhr.send();
+		this._xhr.send(null);
 	};
 	
+	/**
+   * Checks if browser supports this transport.
+   *
+   * @return {Boolean}
+   * @api public
+   */
 	XHRMultipart.check = function(){
 		return 'XMLHttpRequest' in window && 'prototype' in XMLHttpRequest && 'multipart' in XMLHttpRequest.prototype;
 	};
 
+	/**
+   * Check if cross domain requests are supported.
+   *
+   * @returns {Boolean}
+   * @api public
+   */
 	XHRMultipart.xdomainCheck = function(){
 		return true;
 	};
@@ -796,60 +1309,91 @@ io.data.decodeMessage = function(msg){
  */
 
 (function(){
+	var io = this.io,
 
-	var empty = new Function(),
+	/**
+   * A small stub function that will be used to reduce memory leaks.
+   *
+   * @type {Function}
+   * @api private
+   */
+	empty = new Function(),
 
+	/**
+   * The XHR-polling transport uses long polling XHR requests to create a
+   * "persistent" connection with the server.
+   *
+   * @constructor
+   * @extends {io.Transport.XHR}
+   * @api public
+   */
 	XHRPolling = io.Transport['xhr-polling'] = function(){
 		io.Transport.XHR.apply(this, arguments);
 	};
 
 	io.util.inherit(XHRPolling, io.Transport.XHR);
 
+	/**
+   * The transport type, you use this to identify which transport was chosen.
+   *
+   * @type {string}
+   * @api public
+   */
 	XHRPolling.prototype.type = 'xhr-polling';
 
+	/** 
+   * Establish a connection, for iPhone and Android this will be done once the page
+   * is loaded.
+   *
+   * @returns {Transport} Chaining.
+   * @api public
+   */
 	XHRPolling.prototype.connect = function(){
-		if (io.util.ios || io.util.android){
-			var self = this;
-			io.util.load(function(){
-				setTimeout(function(){
-					io.Transport.XHR.prototype.connect.call(self);
-				}, 10);
-			});
-		} else {
-			io.Transport.XHR.prototype.connect.call(this);
-		}
+		var self = this;
+		io.util.defer(function(){ io.Transport.XHR.prototype.connect.call(self) });
+		return false;
 	};
 
+	/**
+   * Starts a XHR request to wait for incoming messages.
+   *
+   * @api private
+   */
 	XHRPolling.prototype._get = function(){
 		var self = this;
 		this._xhr = this._request(+ new Date, 'GET');
-		if ('onload' in this._xhr){
-			this._xhr.onload = function(){
-				self._onData(this.responseText);
-				self._get();
-			};
-		} else {
-			this._xhr.onreadystatechange = function(){
-				var status;
-				if (self._xhr.readyState == 4){
-					self._xhr.onreadystatechange = empty;
-					try { status = self._xhr.status; } catch(e){}
-					if (status == 200){
-						self._onData(self._xhr.responseText);
-						self._get();
-					} else {
-						self._onDisconnect();
-					}
+		this._xhr.onreadystatechange = function(){
+			var status;
+			if (self._xhr.readyState == 4){
+				self._xhr.onreadystatechange = empty;
+				try { status = self._xhr.status; } catch(e){}
+				if (status == 200){
+					self._onData(self._xhr.responseText);
+					self._get();
+				} else {
+					self._onDisconnect();
 				}
-			};
-		}
-		this._xhr.send();
+			}
+		};
+		this._xhr.send(null);
 	};
 
+	/**
+   * Checks if browser supports this transport.
+   *
+   * @return {Boolean}
+   * @api public
+   */
 	XHRPolling.check = function(){
 		return io.Transport.XHR.check();
 	};
 
+	/**
+   * Check if cross domain requests are supported
+   *
+   * @returns {Boolean}
+   * @api public
+   */
 	XHRPolling.xdomainCheck = function(){
 		return io.Transport.XHR.xdomainCheck();
 	};
@@ -863,123 +1407,184 @@ io.data.decodeMessage = function(msg){
  * @copyright Copyright (c) 2010 LearnBoost <dev@learnboost.com>
  */
 
-io.JSONP = [];
+(function(){
+	var io = this.io,
 
-JSONPPolling = io.Transport['jsonp-polling'] = function(){
-	io.Transport.XHR.apply(this, arguments);
-	this._insertAt = document.getElementsByTagName('script')[0];
-	this._index = io.JSONP.length;
-	io.JSONP.push(this);
-};
-
-io.util.inherit(JSONPPolling, io.Transport['xhr-polling']);
-
-JSONPPolling.prototype.type = 'jsonp-polling';
-
-JSONPPolling.prototype._send = function(data){
-	var self = this;
-	if (!('_form' in this)){
-		var form = document.createElement('FORM'),
-		    area = document.createElement('TEXTAREA'),
-		    id = this._iframeId = 'socket_io_iframe_' + this._index,
-		    iframe;
-
-		form.style.position = 'absolute';
-		form.style.top = '-1000px';
-		form.style.left = '-1000px';
-		form.target = id;
-		form.method = 'POST';
-		form.action = this._prepareUrl() + '/' + (+new Date) + '/' + this._index;
-		area.name = 'data';
-		form.appendChild(area);
-		this._insertAt.parentNode.insertBefore(form, this._insertAt);
-		document.body.appendChild(form);
-
-		this._form = form;
-		this._area = area;
-	}
-
-	function complete(){
-		initIframe();
-		self._posting = false;
-		self._checkSend();
+	/**
+   * The JSONP transport creates an persistent connection by dynamically
+   * inserting a script tag in the page. This script tag will receive the
+   * information of the Socket.IO server. When new information is received
+   * it creates a new script tag for the new data stream.
+   *
+   * @constructor
+   * @extends {io.Transport.xhr-polling}
+   * @api public
+   */
+	JSONPPolling = io.Transport['jsonp-polling'] = function(){
+		io.Transport.XHR.apply(this, arguments);
+		this._insertAt = document.getElementsByTagName('script')[0];
+		this._index = io.JSONP.length;
+		io.JSONP.push(this);
 	};
 
-	function initIframe(){
-		if (self._iframe){
-			self._form.removeChild(self._iframe);
-		} 
+	io.util.inherit(JSONPPolling, io.Transport['xhr-polling']);
 
-		try {
-			// ie6 dynamic iframes with target="" support (thanks Chris Lambacher)
-			iframe = document.createElement('<iframe name="'+ self._iframeId +'">');
-		} catch(e){
-			iframe = document.createElement('iframe');
-			iframe.name = self._iframeId;
+	/**
+   * A list of all JSONPolling transports, this is used for by
+   * the Socket.IO server to distribute the callbacks.
+   *
+   * @type {Array}
+   * @api private
+   */
+	io.JSONP = [];
+  
+  /**
+   * The transport type, you use this to identify which transport was chosen.
+   *
+   * @type {String}
+   * @api public
+   */
+	JSONPPolling.prototype.type = 'jsonp-polling';
+
+	/**
+   * Posts a encoded message to the Socket.IO server using an iframe.
+   * The iframe is used because script tags can create POST based requests.
+   * The iframe is positioned outside of the view so the user does not
+   * notice it's existence.
+   *
+   * @param {String} data A encoded message.
+   * @api private
+   */
+	JSONPPolling.prototype._send = function(data){
+		var self = this;
+		if (!('_form' in this)){
+			var form = document.createElement('FORM'),
+				area = document.createElement('TEXTAREA'),
+				id = this._iframeId = 'socket_io_iframe_' + this._index,
+				iframe;
+
+			form.style.position = 'absolute';
+			form.style.top = '-1000px';
+			form.style.left = '-1000px';
+			form.target = id;
+			form.method = 'POST';
+			form.action = this._prepareUrl() + '/' + (+new Date) + '/' + this._index;
+			area.name = 'data';
+			form.appendChild(area);
+			this._insertAt.parentNode.insertBefore(form, this._insertAt);
+			document.body.appendChild(form);
+
+			this._form = form;
+			this._area = area;
 		}
 
-		iframe.id = self._iframeId;
-
-		self._form.appendChild(iframe);
-		self._iframe = iframe;
-	};
-
-	initIframe();
-
-	this._posting = true;
-	this._area.value = data;
-
-	try {
-		this._form.submit();
-	} catch(e){}
-
-	if (this._iframe.attachEvent){
-		iframe.onreadystatechange = function(){
-			if (self._iframe.readyState == 'complete') complete();
+		function complete(){
+			initIframe();
+			self._posting = false;
+			self._checkSend();
 		};
-	} else {
-		this._iframe.onload = complete;
-	}
-};
 
-JSONPPolling.prototype._get = function(){
-	var self = this,
-			script = document.createElement('SCRIPT');
-	if (this._script){
-		this._script.parentNode.removeChild(this._script);
-		this._script = null;
-	}
-	script.async = true;
-	script.src = this._prepareUrl() + '/' + (+new Date) + '/' + this._index;
-	script.onerror = function(){
-		self._onDisconnect();
+		function initIframe(){
+			if (self._iframe){
+				self._form.removeChild(self._iframe);
+			} 
+
+			try {
+				// ie6 dynamic iframes with target="" support (thanks Chris Lambacher)
+				iframe = document.createElement('<iframe name="'+ self._iframeId +'">');
+			} catch(e){
+				iframe = document.createElement('iframe');
+				iframe.name = self._iframeId;
+			}
+
+			iframe.id = self._iframeId;
+
+			self._form.appendChild(iframe);
+			self._iframe = iframe;
+		};
+
+		initIframe();
+
+		this._posting = true;
+		this._area.value = data;
+
+		try {
+			this._form.submit();
+		} catch(e){}
+
+		if (this._iframe.attachEvent){
+			iframe.onreadystatechange = function(){
+				if (self._iframe.readyState == 'complete') complete();
+			};
+		} else {
+			this._iframe.onload = complete;
+		}
 	};
-	this._insertAt.parentNode.insertBefore(script, this._insertAt);
-	this._script = script;
-};
 
-JSONPPolling.prototype.disconnect = function(){
-	if (this._script){
-		this._script.parentNode.removeChild(this._script);
-		this._script = null;
-	}
-  io.Transport['xhr-polling'].prototype.disconnect.call(this);
-  return this;
-};
+	/**
+   * Creates a new JSONP poll that can be used to listen
+   * for messages from the Socket.IO server.
+   *
+   * @api private
+   */
+	JSONPPolling.prototype._get = function(){
+		var self = this,
+				script = document.createElement('SCRIPT');
+		if (this._script){
+			this._script.parentNode.removeChild(this._script);
+			this._script = null;
+		}
+		script.async = true;
+		script.src = this._prepareUrl() + '/' + (+new Date) + '/' + this._index;
+		script.onerror = function(){
+			self._onDisconnect();
+		};
+		this._insertAt.parentNode.insertBefore(script, this._insertAt);
+		this._script = script;
+	};
 
-JSONPPolling.prototype._ = function(){
-	this._onData.apply(this, arguments);
-	this._get();
-	return this;
-};
+	JSONPPolling.prototype.disconnect = function(){
+		if (this._script){
+			this._script.parentNode.removeChild(this._script);
+			this._script = null;
+		}
+	  io.Transport['xhr-polling'].prototype.disconnect.call(this);
+	  return this;
+	};
 
-JSONPPolling.check = function(){
-	return true;
-};
+	/**
+   * Callback function for the incoming message stream from the Socket.IO server.
+   *
+   * @param {String} data The message
+   * @param {document} doc Reference to the context
+   * @api private
+   */
+	JSONPPolling.prototype._ = function(){
+		this._onData.apply(this, arguments);
+		this._get();
+		return this;
+	};
 
-JSONPPolling.xdomainCheck = function(){
-	return true;
-};
+	/**
+   * Checks if browser supports this transport.
+   *
+   * @return {Boolean}
+   * @api public
+   */
+	JSONPPolling.check = function(){
+		return true;
+	};
+
+	/**
+   * Check if cross domain requests are supported
+   *
+   * @returns {Boolean}
+   * @api public
+   */
+	JSONPPolling.xdomainCheck = function(){
+		return true;
+	};
+})();
 
 /**
  * Socket.IO client
@@ -990,7 +1595,57 @@ JSONPPolling.xdomainCheck = function(){
  */
 
 (function(){
+	var io = this.io;
 	
+	/**
+   * Create a new `Socket.IO client` which can establish a persisted
+   * connection with a Socket.IO enabled server.
+   *
+   * Options:
+   *   - `secure`  Use secure connections, defaulting to false.
+   *   - `document`  Reference to the document object to retrieve and set cookies, defaulting to document.
+   *   - `port`  The port where the Socket.IO server listening on, defaulting to location.port.
+   *   - `resource`  The path or namespace on the server where the Socket.IO requests are intercepted, defaulting to 'socket.io'.
+   *   - `transports`  A ordered list with the available transports, defaulting to all transports.
+   *   - `transportOption`  A {Object} containing the options for each transport. The key of the object should reflect
+   *      name of the transport and the value a {Object} with the options.
+   *   - `connectTimeout`  The duration in milliseconds that a transport has to establish a working connection, defaulting to 5000.
+   *   - `tryTransportsOnConnectTimeout`  Should we attempt other transport methods when the connectTimeout occurs, defaulting to true.
+   *   - `reconnect`  Should reconnection happen automatically, defaulting to true.
+   *   - `reconnectionDelay`  The delay in milliseconds before we attempt to establish a working connection. This value will
+   *      increase automatically using a exponential back off algorithm. Defaulting to 500.
+   *   - `maxReconnectionAttempts`  Number of attempts we should make before seizing the reconnect operation, defaulting to 10.
+   *   - `rememberTransport` Should the successfully connected transport be remembered in a cookie, defaulting to true.
+   *
+   * Examples:
+   *
+   * Create client with the default settings.
+   *
+   *     var socket = new io.Socket();
+   *     socket.connect();
+   *     socket.on('message', function(msg){
+   *       console.log('Received message: ' + msg );
+   *     });
+   *     socket.on('connect', function(){
+   *       socket.send('Hello from client');
+   *     });
+   *
+   * Create a connection with server on a different port and host.
+   *
+   *     var socket = new io.Socket('http://example.com',{port:1337});
+   *
+   * @constructor
+   * @exports Socket as io.Socket
+   * @param {String} [host] The host where the Socket.IO server is located, it defaults to the host that runs the page.
+   * @param {Objects} [options] The options that will configure the Socket.IO client. 
+   * @property {String} host The supplied host arguments or the host that page runs.
+   * @property {Object} options The passed options combined with the defaults.
+   * @property {Boolean} connected Whether the socket is connected or not.
+   * @property {Boolean} connecting Whether the socket is connecting or not.
+   * @property {Boolean} reconnecting Whether the socket is reconnecting or not.
+   * @property {Object} transport The selected transport instance.
+   * @api public
+   */
 	var Socket = io.Socket = function(host, options){
 		this.host = host || document.domain;
 		this.options = {
@@ -1009,16 +1664,37 @@ JSONPPolling.xdomainCheck = function(){
 			},
 			connectTimeout: 5000,
 			tryTransportsOnConnectTimeout: true,
+			reconnect: true,
+			reconnectionDelay: 500,
+			maxReconnectionAttempts: 10,
 			rememberTransport: true
 		};
 		io.util.merge(this.options, options);
 		this.connected = false;
 		this.connecting = false;
+		this.reconnecting = false;
 		this._events = {};
 		this.transport = this.getTransport();
 		if (!this.transport && 'console' in window) console.error('No transport available');
 	};
 	
+	/**
+   * Find an available transport based on the options supplied in the constructor. For example if the
+   * `rememberTransport` option was set we will only connect with the previous successfully connected transport.
+   * The supplied transports can be overruled if the `override` argument is supplied.
+   *
+   * Example:
+   *
+   * Override the existing transports.
+   *
+   *     var socket = new io.Socket();
+   *     socket.getTransport(['jsonp-polling','websocket']);
+   *     // returns the json-polling transport because it's availabe in all browsers.
+   *
+   * @param {Array} [override] A ordered list with transports that should be used instead of the options.transports.
+   * @returns {Null|Transport} The available transport.
+   * @api private
+   */
 	Socket.prototype.getTransport = function(override){
 		var transports = override || this.options.transports, match;
 		if (this.options.rememberTransport && !override){
@@ -1038,88 +1714,220 @@ JSONPPolling.xdomainCheck = function(){
 		return null;
 	};
 	
-	Socket.prototype.connect = function(){
+	/**
+   * Establish a new connection with the Socket.IO server. This is done using the selected transport by the
+   * getTransport method. If the `connectTimeout` and the `tryTransportsOnConnectTimeout` options are set
+   * the client will keep trying to connect to the server using a different transports when the timeout occurs.
+   *
+   * Example:
+   *
+   * Create a Socket.IO client with a connect callback (We assume we have the WebSocket transport avaliable).
+   *
+   *     var socket = new io.Socket();
+   *     socket.connect(function(transport){
+   *       console.log("Connected to server using the " + socket.transport.type + " transport.");
+   *     });
+   *     // => "Connected to server using the WebSocket transport."
+   *
+   * @param {Function} [fn] Callback.
+   * @returns {io.Socket}
+   * @api public
+   */
+	Socket.prototype.connect = function(fn){
 		if (this.transport && !this.connected){
-			if (this.connecting) this.disconnect();
+			if (this.connecting) this.disconnect(true);
 			this.connecting = true;
+			this.emit('connecting', [this.transport.type]);
 			this.transport.connect();
 			if (this.options.connectTimeout){
 				var self = this;
-				setTimeout(function(){
+				this.connectTimeoutTimer = setTimeout(function(){
 					if (!self.connected){
-						self.disconnect();
+						self.disconnect(true);
 						if (self.options.tryTransportsOnConnectTimeout && !self._rememberedTransport){
-							var remainingTransports = [], transports = self.options.transports;
-							for (var i = 0, transport; transport = transports[i]; i++){
-								if (transport != self.transport.type) remainingTransports.push(transport);
-							}
-							if (remainingTransports.length){
-								self.transport = self.getTransport(remainingTransports);
+							if(!self.remainingTransports) self.remainingTransports = self.options.transports.slice(0);
+							var transports = self.remainingTransports;
+							while(transports.length > 0 && transports.splice(0,1)[0] != self.transport.type){}
+							if(transports.length){
+								self.transport = self.getTransport(transports);
 								self.connect();
 							}
 						}
+						if(!self.remainingTransports || self.remainingTransports.length == 0) self.emit('connect_failed');
 					}
+					if(self.remainingTransports && self.remainingTransports.length == 0) delete self.remainingTransports;		
 				}, this.options.connectTimeout);
 			}
 		}
+		if (fn && typeof fn == 'function') this.once('connect',fn);
 		return this;
 	};
 	
+	/**
+   * Sends the data to the Socket.IO server. If there isn't a connection to the server
+   * the data will be forwarded to the queue.
+   *
+   * @param {Mixed} data The data that needs to be send to the Socket.IO server.
+   * @returns {io.Socket}
+   * @api public
+   */
 	Socket.prototype.write = function(message, atts){
 		if (!this.transport || !this.transport.connected) return this._queue(message, atts);
 		this.transport.write(message, atts);
 		return this;
 	};
 	
-  Socket.prototype.send = function(message, atts){
-    atts = atts || {};
-    if (typeof message == 'object'){
-      atts['j'] = null;
-      message = JSON.stringify(message);
-    }
-    this.write('1', io.data.encodeMessage(message, atts));
-    return this;
-  };
+	Socket.prototype.send = function(message, atts){
+		atts = atts || {};
+		if (typeof message == 'object'){
+			atts['j'] = null;
+			message = JSON.stringify(message);
+		}
+		this.write('1', io.data.encodeMessage(message, atts));
+		return this;
+	};
 
-  Socket.prototype.json = function(obj, atts){
-    atts = atts || {};
-    atts['j'] = null
-    return this.send(JSON.stringify(obj), atts);
-  }
+	Socket.prototype.json = function(obj, atts){
+		atts = atts || {};
+		atts['j'] = null
+		return this.send(JSON.stringify(obj), atts);
+	}
 
-	Socket.prototype.disconnect = function(){
+	/**
+   * Disconnect the established connect.
+   *
+   * @param {Boolean} [soft] A soft disconnect will keep the reconnect settings enabled.
+   * @returns {io.Socket}
+   * @api public
+   */
+	Socket.prototype.disconnect = function(soft){
+		if (this.connectTimeoutTimer) clearTimeout(this.connectTimeoutTimer);
+		if (!soft) this.options.reconnect = false;
 		this.transport.disconnect();
 		return this;
 	};
 	
+	/**
+   * Adds a new eventListener for the given event.
+   *
+   * Example:
+   *
+   *     var socket = new io.Socket();
+   *     socket.on("connect", function(transport){
+   *       console.log("Connected to server using the " + socket.transport.type + " transport.");
+   *     });
+   *     // => "Connected to server using the WebSocket transport."
+   *
+   * @param {String} name The name of the event.
+   * @param {Function} fn The function that is called once the event is emitted.
+   * @returns {io.Socket}
+   * @api public
+   */
 	Socket.prototype.on = function(name, fn){
 		if (!(name in this._events)) this._events[name] = [];
 		this._events[name].push(fn);
 		return this;
 	};
 	
+	 /**
+   * Adds a one time listener, the listener will be removed after the event is emitted.
+   *
+   * Example:
+   *
+   *     var socket = new io.Socket();
+   *     socket.once("custom:event", function(){
+   *       console.log("I should only log once.");
+   *     });
+   *     socket.emit("custom:event");
+   *     socket.emit("custom:event");
+   *     // => "I should only log once."
+   *
+   * @param {String} name The name of the event.
+   * @param {Function} fn The function that is called once the event is emitted.
+   * @returns {io.Socket}
+   * @api public
+   */
+	Socket.prototype.once = function(name, fn){
+		var self = this
+		, once = function(){
+			self.removeEvent(name, once);
+			fn.apply(self, arguments);
+		};
+		once.ref = fn;
+		self.on(name, once);
+		return this;
+	};
+	
+	/**
+   * Emit a event to all listeners.
+   *
+   * Example:
+   *
+   *     var socket = new io.Socket();
+   *     socket.on("custom:event", function(){
+   *       console.log("Emitted a custom:event");
+   *     });
+   *     socket.emit("custom:event");
+   *     // => "Emitted a custom:event"
+   *
+   * @param {String} name The name of the event.
+   * @param {Array} args Arguments for the event.
+   * @returns {io.Socket}
+   * @api private
+   */
 	Socket.prototype.emit = function(name, args){
 		if (name in this._events){
+			var events = this._events[name].concat();
 			for (var i = 0, ii = this._events[name].length; i < ii; i++) 
-				this._events[name][i].apply(this, args === undefined ? [] : args);
+				events[i].apply(this, args === undefined ? [] : args);
 		}
 		return this;
 	};
 	
+	/**
+   * Removes a event listener from the listener array for the specified event.
+   *
+   * Example:
+   *
+   *     var socket = new io.Socket()
+   *       , event = function(){};
+   *     socket.on("connect", event);
+   *     socket.removeEvent("connect", event);
+   *
+   * @param {String} name The name of the event.
+   * @param {Function} fn The function that is called once the event is emitted.
+   * @returns {io.Socket}
+   * @api public
+   */
 	Socket.prototype.removeEvent = function(name, fn){
 		if (name in this._events){
 			for (var a = 0, l = this._events[name].length; a < l; a++)
-				if (this._events[name][a] == fn) this._events[name].splice(a, 1);		
+				if (this._events[name][a] == fn || this._events[name][a].ref && this._events[name][a].ref == fn) this._events[name].splice(a, 1);
 		}
 		return this;
 	};
 	
+	/**
+   * Queues messages when there isn't a active connection available. Once a connection has been
+   * established you should call the `doQueue` method to send the queued messages to the server.
+   *
+   * @param {Mixed} message The message that was originally send to the `send` method.
+   * @returns {io.Socket}
+   * @api private
+   */
 	Socket.prototype._queue = function(message, atts){
 		if (!('_queueStack' in this)) this._queueStack = [];
 		this._queueStack.push([message, atts]);
 		return this;
 	};
 	
+	/**
+   * If there are queued messages we send all messages to the Socket.IO server and empty
+   * the queue.
+   *
+   * @returns {io.Socket}
+   * @api private
+   */
 	Socket.prototype._doQueue = function(){
 		if (!('_queueStack' in this) || !this._queueStack.length) return this;
 		this.transport.write(this._queueStack);
@@ -1127,10 +1935,25 @@ JSONPPolling.xdomainCheck = function(){
 		return this;
 	};
 	
+	/**
+   * Check if we need to use cross domain enabled transports. Cross domain would
+   * be a different port or different domain name.
+   *
+   * @returns {Boolean}
+   * @api private
+   */
 	Socket.prototype._isXDomain = function(){
-		return this.host !== document.domain;
+		var locPort = window.location.port || 80;
+		return this.host !== document.domain || this.options.port != locPort;
 	};
 	
+	/**
+   * When the transport established an working connection the Socket.IO server it notifies us
+   * by calling this method so we can set the `connected` and `connecting` properties and emit
+   * the connection event.
+   *
+   * @api private
+   */
 	Socket.prototype._onConnect = function(){
 		this.connected = true;
 		this.connecting = false;
@@ -1139,24 +1962,110 @@ JSONPPolling.xdomainCheck = function(){
 		this.emit('connect');
 	};
 	
+	/**
+   * When the transport receives new messages from the Socket.IO server it notifies us by calling
+   * this method with the decoded `data` it received.
+   *
+   * @param data The message from the Socket.IO server.
+   * @api private
+   */
 	Socket.prototype._onMessage = function(data){
 		this.emit('message', [data]);
 	};
 	
+	/**
+   * When the transport is disconnected from the Socket.IO server it notifies us by calling
+   * this method. If we where connected and the `reconnect` is set we will attempt to reconnect.
+   *
+   * @api private
+   */
 	Socket.prototype._onDisconnect = function(){
 		var wasConnected = this.connected;
 		this.connected = false;
 		this.connecting = false;
-		this._queueStack = [];
-		if (wasConnected) this.emit('disconnect');
+		if (wasConnected) {
+			this._queueStack = [];	/*should fix this in main repo*/
+			this.emit('disconnect');
+			if (this.options.reconnect && !this.reconnecting) this.onReconnect();
+		}
 	};
 	
-	Socket.prototype.addListener = Socket.prototype.addEvent = Socket.prototype.addEventListener = Socket.prototype.on;
+	/**
+   * The reconnection is done using an exponential back off algorithm to prevent
+   * the server from being flooded with connection requests. When the transport
+   * is disconnected we wait until the `reconnectionDelay` finishes. We multiply 
+   * the `reconnectionDelay` (if the previous `reconnectionDelay` was 500 it will
+   * be updated to 1000 and than 2000>4000>8000>16000 etc.) and tell the current
+   * transport to connect again. When we run out of `reconnectionAttempts` we will 
+   * do one final attempt and loop over all enabled transport methods to see if 
+   * other transports might work. If everything fails we emit the `reconnect_failed`
+   * event.
+   *
+   * @api private
+   */
+  Socket.prototype.onReconnect = function(){
+    this.reconnecting = true;
+    this.reconnectionAttempts = 0;
+    this.reconnectionDelay = this.options.reconnectionDelay;
+    
+    var self = this
+      , tryTransportsOnConnectTimeout = this.options.tryTransportsOnConnectTimeout
+      , rememberTransport = this.options.rememberTransport;
+    
+    function reset(){
+      if(self.connected) self.emit('reconnect',[self.transport.type,self.reconnectionAttempts]);
+      self.removeEvent('connect_failed', maybeReconnect).removeEvent('connect', maybeReconnect);
+      self.reconnecting = false;
+      delete self.reconnectionAttempts;
+      delete self.reconnectionDelay;
+      delete self.reconnectionTimer;
+      delete self.redoTransports;
+      self.options.tryTransportsOnConnectTimeout = tryTransportsOnConnectTimeout;
+      self.options.rememberTransport = rememberTransport;
+      
+      return;
+    };
+    
+    function maybeReconnect(){
+      if (!self.reconnecting) return;
+      if (!self.connected){
+        if (self.connecting && self.reconnecting) return self.reconnectionTimer = setTimeout(maybeReconnect, 1000);
+        
+        if (self.reconnectionAttempts++ >= self.options.maxReconnectionAttempts){
+          if (!self.redoTransports){
+            self.on('connect_failed', maybeReconnect);
+            self.options.tryTransportsOnConnectTimeout = true;
+            self.transport = self.getTransport(self.options.transports); // override with all enabled transports
+            self.redoTransports = true;
+            self.connect();
+          } else {
+            self.emit('reconnect_failed');
+            reset();
+          }
+        } else {
+          self.reconnectionDelay *= 2; // exponential back off
+          self.connect();
+          self.emit('reconnecting', [self.reconnectionDelay,self.reconnectionAttempts]);
+          self.reconnectionTimer = setTimeout(maybeReconnect, self.reconnectionDelay);
+        }
+      } else {
+        reset();
+      }
+    };
+    this.options.tryTransportsOnConnectTimeout = false;
+    this.reconnectionTimer = setTimeout(maybeReconnect, this.reconnectionDelay);
+    
+    this.on('connect', maybeReconnect);
+  };
 	
-  Socket.prototype.fire = Socket.prototype.emit;
+	/**
+   * API compatiblity
+   */
+	Socket.prototype.fire = Socket.prototype.emit;
+	Socket.prototype.addListener = Socket.prototype.addEvent = Socket.prototype.addEventListener = Socket.prototype.on;
+	Socket.prototype.removeListener = Socket.prototype.removeEventListener = Socket.prototype.removeEvent;
 
 })();
-
 /*	SWFObject v2.2 <http://code.google.com/p/swfobject/> 
 	is released under the MIT License <http://www.opensource.org/licenses/mit-license.php> 
 */
@@ -1178,608 +2087,22 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OU
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
-
-
-/*
- * The Bridge class, responsible for navigating AS instances
- */
-function FABridge(target,bridgeName)
-{
-    this.target = target;
-    this.remoteTypeCache = {};
-    this.remoteInstanceCache = {};
-    this.remoteFunctionCache = {};
-    this.localFunctionCache = {};
-    this.bridgeID = FABridge.nextBridgeID++;
-    this.name = bridgeName;
-    this.nextLocalFuncID = 0;
-    FABridge.instances[this.name] = this;
-    FABridge.idMap[this.bridgeID] = this;
-
-    return this;
-}
-
-// type codes for packed values
-FABridge.TYPE_ASINSTANCE =  1;
-FABridge.TYPE_ASFUNCTION =  2;
-
-FABridge.TYPE_JSFUNCTION =  3;
-FABridge.TYPE_ANONYMOUS =   4;
-
-FABridge.initCallbacks = {};
-FABridge.userTypes = {};
-
-FABridge.addToUserTypes = function()
-{
-	for (var i = 0; i < arguments.length; i++)
-	{
-		FABridge.userTypes[arguments[i]] = {
-			'typeName': arguments[i], 
-			'enriched': false
-		};
-	}
-}
-
-FABridge.argsToArray = function(args)
-{
-    var result = [];
-    for (var i = 0; i < args.length; i++)
-    {
-        result[i] = args[i];
-    }
-    return result;
-}
-
-function instanceFactory(objID)
-{
-    this.fb_instance_id = objID;
-    return this;
-}
-
-function FABridge__invokeJSFunction(args)
-{  
-    var funcID = args[0];
-    var throughArgs = args.concat();//FABridge.argsToArray(arguments);
-    throughArgs.shift();
-   
-    var bridge = FABridge.extractBridgeFromID(funcID);
-    return bridge.invokeLocalFunction(funcID, throughArgs);
-}
-
-FABridge.addInitializationCallback = function(bridgeName, callback)
-{
-    var inst = FABridge.instances[bridgeName];
-    if (inst != undefined)
-    {
-        callback.call(inst);
-        return;
-    }
-
-    var callbackList = FABridge.initCallbacks[bridgeName];
-    if(callbackList == null)
-    {
-        FABridge.initCallbacks[bridgeName] = callbackList = [];
-    }
-
-    callbackList.push(callback);
-}
-
-// updated for changes to SWFObject2
-function FABridge__bridgeInitialized(bridgeName) {
-    var objects = document.getElementsByTagName("object");
-    var ol = objects.length;
-    var activeObjects = [];
-    if (ol > 0) {
-		for (var i = 0; i < ol; i++) {
-			if (typeof objects[i].SetVariable != "undefined") {
-				activeObjects[activeObjects.length] = objects[i];
-			}
-		}
-	}
-    var embeds = document.getElementsByTagName("embed");
-    var el = embeds.length;
-    var activeEmbeds = [];
-    if (el > 0) {
-		for (var j = 0; j < el; j++) {
-			if (typeof embeds[j].SetVariable != "undefined") {
-            	activeEmbeds[activeEmbeds.length] = embeds[j];
-            }
-        }
-    }
-    var aol = activeObjects.length;
-    var ael = activeEmbeds.length;
-    var searchStr = "bridgeName="+ bridgeName;
-    if ((aol == 1 && !ael) || (aol == 1 && ael == 1)) {
-    	FABridge.attachBridge(activeObjects[0], bridgeName);	 
-    }
-    else if (ael == 1 && !aol) {
-    	FABridge.attachBridge(activeEmbeds[0], bridgeName);
-        }
-    else {
-                var flash_found = false;
-		if (aol > 1) {
-			for (var k = 0; k < aol; k++) {
-				 var params = activeObjects[k].childNodes;
-				 for (var l = 0; l < params.length; l++) {
-					var param = params[l];
-					if (param.nodeType == 1 && param.tagName.toLowerCase() == "param" && param["name"].toLowerCase() == "flashvars" && param["value"].indexOf(searchStr) >= 0) {
-						FABridge.attachBridge(activeObjects[k], bridgeName);
-                            flash_found = true;
-                            break;
-                        }
-                    }
-                if (flash_found) {
-                    break;
-                }
-            }
-        }
-		if (!flash_found && ael > 1) {
-			for (var m = 0; m < ael; m++) {
-				var flashVars = activeEmbeds[m].attributes.getNamedItem("flashVars").nodeValue;
-				if (flashVars.indexOf(searchStr) >= 0) {
-					FABridge.attachBridge(activeEmbeds[m], bridgeName);
-					break;
-    }
-            }
-        }
-    }
-    return true;
-}
-
-// used to track multiple bridge instances, since callbacks from AS are global across the page.
-
-FABridge.nextBridgeID = 0;
-FABridge.instances = {};
-FABridge.idMap = {};
-FABridge.refCount = 0;
-
-FABridge.extractBridgeFromID = function(id)
-{
-    var bridgeID = (id >> 16);
-    return FABridge.idMap[bridgeID];
-}
-
-FABridge.attachBridge = function(instance, bridgeName)
-{
-    var newBridgeInstance = new FABridge(instance, bridgeName);
-
-    FABridge[bridgeName] = newBridgeInstance;
-
-/*  FABridge[bridgeName] = function() {
-        return newBridgeInstance.root();
-    }
-*/
-    var callbacks = FABridge.initCallbacks[bridgeName];
-    if (callbacks == null)
-    {
-        return;
-    }
-    for (var i = 0; i < callbacks.length; i++)
-    {
-        callbacks[i].call(newBridgeInstance);
-    }
-    delete FABridge.initCallbacks[bridgeName]
-}
-
-// some methods can't be proxied.  You can use the explicit get,set, and call methods if necessary.
-
-FABridge.blockedMethods =
-{
-    toString: true,
-    get: true,
-    set: true,
-    call: true
-};
-
-FABridge.prototype =
-{
-
-
-// bootstrapping
-
-    root: function()
-    {
-        return this.deserialize(this.target.getRoot());
-    },
-//clears all of the AS objects in the cache maps
-    releaseASObjects: function()
-    {
-        return this.target.releaseASObjects();
-    },
-//clears a specific object in AS from the type maps
-    releaseNamedASObject: function(value)
-    {
-        if(typeof(value) != "object")
-        {
-            return false;
-        }
-        else
-        {
-            var ret =  this.target.releaseNamedASObject(value.fb_instance_id);
-            return ret;
-        }
-    },
-//create a new AS Object
-    create: function(className)
-    {
-        return this.deserialize(this.target.create(className));
-    },
-
-
-    // utilities
-
-    makeID: function(token)
-    {
-        return (this.bridgeID << 16) + token;
-    },
-
-
-    // low level access to the flash object
-
-//get a named property from an AS object
-    getPropertyFromAS: function(objRef, propName)
-    {
-        if (FABridge.refCount > 0)
-        {
-            throw new Error("You are trying to call recursively into the Flash Player which is not allowed. In most cases the JavaScript setTimeout function, can be used as a workaround.");
-        }
-        else
-        {
-            FABridge.refCount++;
-            retVal = this.target.getPropFromAS(objRef, propName);
-            retVal = this.handleError(retVal);
-            FABridge.refCount--;
-            return retVal;
-        }
-    },
-//set a named property on an AS object
-    setPropertyInAS: function(objRef,propName, value)
-    {
-        if (FABridge.refCount > 0)
-        {
-            throw new Error("You are trying to call recursively into the Flash Player which is not allowed. In most cases the JavaScript setTimeout function, can be used as a workaround.");
-        }
-        else
-        {
-            FABridge.refCount++;
-            retVal = this.target.setPropInAS(objRef,propName, this.serialize(value));
-            retVal = this.handleError(retVal);
-            FABridge.refCount--;
-            return retVal;
-        }
-    },
-
-//call an AS function
-    callASFunction: function(funcID, args)
-    {
-        if (FABridge.refCount > 0)
-        {
-            throw new Error("You are trying to call recursively into the Flash Player which is not allowed. In most cases the JavaScript setTimeout function, can be used as a workaround.");
-        }
-        else
-        {
-            FABridge.refCount++;
-            retVal = this.target.invokeASFunction(funcID, this.serialize(args));
-            retVal = this.handleError(retVal);
-            FABridge.refCount--;
-            return retVal;
-        }
-    },
-//call a method on an AS object
-    callASMethod: function(objID, funcName, args)
-    {
-        if (FABridge.refCount > 0)
-        {
-            throw new Error("You are trying to call recursively into the Flash Player which is not allowed. In most cases the JavaScript setTimeout function, can be used as a workaround.");
-        }
-        else
-        {
-            FABridge.refCount++;
-            args = this.serialize(args);
-            retVal = this.target.invokeASMethod(objID, funcName, args);
-            retVal = this.handleError(retVal);
-            FABridge.refCount--;
-            return retVal;
-        }
-    },
-
-    // responders to remote calls from flash
-
-    //callback from flash that executes a local JS function
-    //used mostly when setting js functions as callbacks on events
-    invokeLocalFunction: function(funcID, args)
-    {
-        var result;
-        var func = this.localFunctionCache[funcID];
-
-        if(func != undefined)
-        {
-            result = this.serialize(func.apply(null, this.deserialize(args)));
-        }
-
-        return result;
-    },
-
-    // Object Types and Proxies
-	
-    // accepts an object reference, returns a type object matching the obj reference.
-    getTypeFromName: function(objTypeName)
-    {
-        return this.remoteTypeCache[objTypeName];
-    },
-    //create an AS proxy for the given object ID and type
-    createProxy: function(objID, typeName)
-    {
-        var objType = this.getTypeFromName(typeName);
-	        instanceFactory.prototype = objType;
-	        var instance = new instanceFactory(objID);
-        this.remoteInstanceCache[objID] = instance;
-        return instance;
-    },
-    //return the proxy associated with the given object ID
-    getProxy: function(objID)
-    {
-        return this.remoteInstanceCache[objID];
-    },
-
-    // accepts a type structure, returns a constructed type
-    addTypeDataToCache: function(typeData)
-    {
-        var newType = new ASProxy(this, typeData.name);
-        var accessors = typeData.accessors;
-        for (var i = 0; i < accessors.length; i++)
-        {
-            this.addPropertyToType(newType, accessors[i]);
-        }
-
-        var methods = typeData.methods;
-        for (var i = 0; i < methods.length; i++)
-        {
-            if (FABridge.blockedMethods[methods[i]] == undefined)
-            {
-                this.addMethodToType(newType, methods[i]);
-            }
-        }
-
-
-        this.remoteTypeCache[newType.typeName] = newType;
-        return newType;
-    },
-
-    //add a property to a typename; used to define the properties that can be called on an AS proxied object
-    addPropertyToType: function(ty, propName)
-    {
-        var c = propName.charAt(0);
-        var setterName;
-        var getterName;
-        if(c >= "a" && c <= "z")
-        {
-            getterName = "get" + c.toUpperCase() + propName.substr(1);
-            setterName = "set" + c.toUpperCase() + propName.substr(1);
-        }
-        else
-        {
-            getterName = "get" + propName;
-            setterName = "set" + propName;
-        }
-        ty[setterName] = function(val)
-        {
-            this.bridge.setPropertyInAS(this.fb_instance_id, propName, val);
-        }
-        ty[getterName] = function()
-        {
-            return this.bridge.deserialize(this.bridge.getPropertyFromAS(this.fb_instance_id, propName));
-        }
-    },
-
-    //add a method to a typename; used to define the methods that can be callefd on an AS proxied object
-    addMethodToType: function(ty, methodName)
-    {
-        ty[methodName] = function()
-        {
-            return this.bridge.deserialize(this.bridge.callASMethod(this.fb_instance_id, methodName, FABridge.argsToArray(arguments)));
-        }
-    },
-
-    // Function Proxies
-
-    //returns the AS proxy for the specified function ID
-    getFunctionProxy: function(funcID)
-    {
-        var bridge = this;
-        if (this.remoteFunctionCache[funcID] == null)
-        {
-            this.remoteFunctionCache[funcID] = function()
-            {
-                bridge.callASFunction(funcID, FABridge.argsToArray(arguments));
-            }
-        }
-        return this.remoteFunctionCache[funcID];
-    },
-    
-    //reutrns the ID of the given function; if it doesnt exist it is created and added to the local cache
-    getFunctionID: function(func)
-    {
-        if (func.__bridge_id__ == undefined)
-        {
-            func.__bridge_id__ = this.makeID(this.nextLocalFuncID++);
-            this.localFunctionCache[func.__bridge_id__] = func;
-        }
-        return func.__bridge_id__;
-    },
-
-    // serialization / deserialization
-
-    serialize: function(value)
-    {
-        var result = {};
-
-        var t = typeof(value);
-        //primitives are kept as such
-        if (t == "number" || t == "string" || t == "boolean" || t == null || t == undefined)
-        {
-            result = value;
-        }
-        else if (value instanceof Array)
-        {
-            //arrays are serializesd recursively
-            result = [];
-            for (var i = 0; i < value.length; i++)
-            {
-                result[i] = this.serialize(value[i]);
-            }
-        }
-        else if (t == "function")
-        {
-            //js functions are assigned an ID and stored in the local cache 
-            result.type = FABridge.TYPE_JSFUNCTION;
-            result.value = this.getFunctionID(value);
-        }
-        else if (value instanceof ASProxy)
-        {
-            result.type = FABridge.TYPE_ASINSTANCE;
-            result.value = value.fb_instance_id;
-        }
-        else
-        {
-            result.type = FABridge.TYPE_ANONYMOUS;
-            result.value = value;
-        }
-
-        return result;
-    },
-
-    //on deserialization we always check the return for the specific error code that is used to marshall NPE's into JS errors
-    // the unpacking is done by returning the value on each pachet for objects/arrays 
-    deserialize: function(packedValue)
-    {
-
-        var result;
-
-        var t = typeof(packedValue);
-        if (t == "number" || t == "string" || t == "boolean" || packedValue == null || packedValue == undefined)
-        {
-            result = this.handleError(packedValue);
-        }
-        else if (packedValue instanceof Array)
-        {
-            result = [];
-            for (var i = 0; i < packedValue.length; i++)
-            {
-                result[i] = this.deserialize(packedValue[i]);
-            }
-        }
-        else if (t == "object")
-        {
-            for(var i = 0; i < packedValue.newTypes.length; i++)
-            {
-                this.addTypeDataToCache(packedValue.newTypes[i]);
-            }
-            for (var aRefID in packedValue.newRefs)
-            {
-                this.createProxy(aRefID, packedValue.newRefs[aRefID]);
-            }
-            if (packedValue.type == FABridge.TYPE_PRIMITIVE)
-            {
-                result = packedValue.value;
-            }
-            else if (packedValue.type == FABridge.TYPE_ASFUNCTION)
-            {
-                result = this.getFunctionProxy(packedValue.value);
-            }
-            else if (packedValue.type == FABridge.TYPE_ASINSTANCE)
-            {
-                result = this.getProxy(packedValue.value);
-            }
-            else if (packedValue.type == FABridge.TYPE_ANONYMOUS)
-            {
-                result = packedValue.value;
-            }
-        }
-        return result;
-    },
-    //increases the reference count for the given object
-    addRef: function(obj)
-    {
-        this.target.incRef(obj.fb_instance_id);
-    },
-    //decrease the reference count for the given object and release it if needed
-    release:function(obj)
-    {
-        this.target.releaseRef(obj.fb_instance_id);
-    },
-
-    // check the given value for the components of the hard-coded error code : __FLASHERROR
-    // used to marshall NPE's into flash
-    
-    handleError: function(value)
-    {
-        if (typeof(value)=="string" && value.indexOf("__FLASHERROR")==0)
-        {
-            var myErrorMessage = value.split("||");
-            if(FABridge.refCount > 0 )
-            {
-                FABridge.refCount--;
-            }
-            throw new Error(myErrorMessage[1]);
-            return value;
-        }
-        else
-        {
-            return value;
-        }   
-    }
-};
-
-// The root ASProxy class that facades a flash object
-
-ASProxy = function(bridge, typeName)
-{
-    this.bridge = bridge;
-    this.typeName = typeName;
-    return this;
-};
-//methods available on each ASProxy object
-ASProxy.prototype =
-{
-    get: function(propName)
-    {
-        return this.bridge.deserialize(this.bridge.getPropertyFromAS(this.fb_instance_id, propName));
-    },
-
-    set: function(propName, value)
-    {
-        this.bridge.setPropertyInAS(this.fb_instance_id, propName, value);
-    },
-
-    call: function(funcName, args)
-    {
-        this.bridge.callASMethod(this.fb_instance_id, funcName, args);
-    }, 
-    
-    addRef: function() {
-        this.bridge.addRef(this);
-    }, 
-    
-    release: function() {
-        this.bridge.release(this);
-    }
-};
-
 // Copyright: Hiroshi Ichikawa <http://gimite.net/en/>
 // License: New BSD License
 // Reference: http://dev.w3.org/html5/websockets/
 // Reference: http://tools.ietf.org/html/draft-hixie-thewebsocketprotocol
 
-(function() {
+(function(){
   
   if (window.WebSocket) return;
 
   var console = window.console;
-  if (!console) console = {log: function(){ }, error: function(){ }};
+  if (!console || !console.log || !console.error) {
+    console = {log: function(){ }, error: function(){ }};
+  }
 
-  if (!swfobject.hasFlashPlayerVersion("9.0.0")) {
-    console.error("Flash Player is not installed.");
+  if (!swfobject.hasFlashPlayerVersion("10.0.0")) {
+    console.error("Flash Player >= 10.0.0 is required.");
     return;
   }
   if (location.protocol == "file:") {
@@ -1789,84 +2112,43 @@ ASProxy.prototype =
       "Open the page via Web server i.e. http://...");
   }
 
-  WebSocket = function(url, protocol, proxyHost, proxyPort, headers) {
+  /**
+   * This class represents a faux web socket.
+   * @param {string} url
+   * @param {array or string} protocols
+   * @param {string} proxyHost
+   * @param {int} proxyPort
+   * @param {string} headers
+   */
+  WebSocket = function(url, protocols, proxyHost, proxyPort, headers) {
     var self = this;
+    self.__id = WebSocket.__nextId++;
+    WebSocket.__instances[self.__id] = self;
     self.readyState = WebSocket.CONNECTING;
     self.bufferedAmount = 0;
+    self.__events = {};
+    if (!protocols) {
+      protocols = [];
+    } else if (typeof protocols == "string") {
+      protocols = [protocols];
+    }
     // Uses setTimeout() to make sure __createFlash() runs after the caller sets ws.onopen etc.
     // Otherwise, when onopen fires immediately, onopen is called before it is set.
     setTimeout(function() {
       WebSocket.__addTask(function() {
-        self.__createFlash(url, protocol, proxyHost, proxyPort, headers);
+        WebSocket.__flash.create(
+            self.__id, url, protocols, proxyHost || null, proxyPort || 0, headers || null);
       });
-    }, 1);
-  }
-  
-  WebSocket.prototype.__createFlash = function(url, protocol, proxyHost, proxyPort, headers) {
-    var self = this;
-    self.__flash =
-      WebSocket.__flash.create(url, protocol, proxyHost || null, proxyPort || 0, headers || null);
-
-    self.__flash.addEventListener("open", function(fe) {
-      try {
-        self.readyState = self.__flash.getReadyState();
-        if (self.__timer) clearInterval(self.__timer);
-        if (window.opera) {
-          // Workaround for weird behavior of Opera which sometimes drops events.
-          self.__timer = setInterval(function () {
-            self.__handleMessages();
-          }, 500);
-        }
-        if (self.onopen) self.onopen();
-      } catch (e) {
-        console.error(e.toString());
-      }
-    });
-
-    self.__flash.addEventListener("close", function(fe) {
-      try {
-        self.readyState = self.__flash.getReadyState();
-        if (self.__timer) clearInterval(self.__timer);
-        if (self.onclose) self.onclose();
-      } catch (e) {
-        console.error(e.toString());
-      }
-    });
-
-    self.__flash.addEventListener("message", function() {
-      try {
-        self.__handleMessages();
-      } catch (e) {
-        console.error(e.toString());
-      }
-    });
-
-    self.__flash.addEventListener("error", function(fe) {
-      try {
-        if (self.__timer) clearInterval(self.__timer);
-        if (self.onerror) self.onerror();
-      } catch (e) {
-        console.error(e.toString());
-      }
-    });
-
-    self.__flash.addEventListener("stateChange", function(fe) {
-      try {
-        self.readyState = self.__flash.getReadyState();
-        self.bufferedAmount = fe.getBufferedAmount();
-      } catch (e) {
-        console.error(e.toString());
-      }
-    });
-
-    //console.log("[WebSocket] Flash object is ready");
+    }, 0);
   };
 
+  /**
+   * Send data to the web socket.
+   * @param {string} data  The data to send to the socket.
+   * @return {boolean}  True for success, false for failure.
+   */
   WebSocket.prototype.send = function(data) {
-    if (this.__flash) {
-      this.readyState = this.__flash.getReadyState();
-    }
-    if (!this.__flash || this.readyState == WebSocket.CONNECTING) {
+    if (this.readyState == WebSocket.CONNECTING) {
       throw "INVALID_STATE_ERR: Web Socket connection has not been established";
     }
     // We use encodeURIComponent() here, because FABridge doesn't work if
@@ -1875,7 +2157,9 @@ ASProxy.prototype =
     // https://developer.mozilla.org/en/Core_JavaScript_1.5_Guide/Functions#escape_and_unescape_Functions
     // But it looks decodeURIComponent(encodeURIComponent(s)) doesn't
     // preserve all Unicode characters either e.g. "\uffff" in Firefox.
-    var result = this.__flash.send(encodeURIComponent(data));
+    // Note by wtritch: Hopefully this will not be necessary using ExternalInterface.  Will require
+    // additional testing.
+    var result = WebSocket.__flash.send(this.__id, encodeURIComponent(data));
     if (result < 0) { // success
       return true;
     } else {
@@ -1884,22 +2168,15 @@ ASProxy.prototype =
     }
   };
 
+  /**
+   * Close this web socket gracefully.
+   */
   WebSocket.prototype.close = function() {
-    var self = this;
-    if (!self.__flash) return;
-    self.readyState = self.__flash.getReadyState();
-    if (self.readyState == WebSocket.CLOSED || self.readyState == WebSocket.CLOSING) return;
-    self.__flash.close();
-    // Sets/calls them manually here because Flash WebSocketConnection.close cannot fire events
-    // which causes weird error:
-    // > You are trying to call recursively into the Flash Player which is not allowed.
-    self.readyState = WebSocket.CLOSED;
-    if (self.__timer) clearInterval(self.__timer);
-    if (self.onclose) {
-       // Make it asynchronous so that it looks more like an actual
-       // close event
-       setTimeout(self.onclose, 1);
-     }
+    if (this.readyState == WebSocket.CLOSED || this.readyState == WebSocket.CLOSING) {
+      return;
+    }
+    this.readyState = WebSocket.CLOSING;
+    WebSocket.__flash.close(this.__id);
   };
 
   /**
@@ -1907,19 +2184,12 @@ ASProxy.prototype =
    *
    * @param {string} type
    * @param {function} listener
-   * @param {boolean} useCapture !NB Not implemented yet
+   * @param {boolean} useCapture
    * @return void
    */
   WebSocket.prototype.addEventListener = function(type, listener, useCapture) {
-    if (!('__events' in this)) {
-      this.__events = {};
-    }
     if (!(type in this.__events)) {
       this.__events[type] = [];
-      if ('function' == typeof this['on' + type]) {
-        this.__events[type].defaultHandler = this['on' + type];
-        this['on' + type] = this.__createEventHandler(this, type);
-      }
     }
     this.__events[type].push(listener);
   };
@@ -1929,17 +2199,15 @@ ASProxy.prototype =
    *
    * @param {string} type
    * @param {function} listener
-   * @param {boolean} useCapture NB! Not implemented yet
+   * @param {boolean} useCapture
    * @return void
    */
   WebSocket.prototype.removeEventListener = function(type, listener, useCapture) {
-    if (!('__events' in this)) {
-      this.__events = {};
-    }
     if (!(type in this.__events)) return;
-    for (var i = this.__events.length; i > -1; --i) {
-      if (listener === this.__events[type][i]) {
-        this.__events[type].splice(i, 1);
+    var events = this.__events[type];
+    for (var i = events.length - 1; i >= 0; --i) {
+      if (events[i] === listener) {
+        events.splice(i, 1);
         break;
       }
     }
@@ -1952,121 +2220,92 @@ ASProxy.prototype =
    * @return void
    */
   WebSocket.prototype.dispatchEvent = function(event) {
-    if (!('__events' in this)) throw 'UNSPECIFIED_EVENT_TYPE_ERR';
-    if (!(event.type in this.__events)) throw 'UNSPECIFIED_EVENT_TYPE_ERR';
-
-    for (var i = 0, l = this.__events[event.type].length; i < l; ++ i) {
-      this.__events[event.type][i](event);
-      if (event.cancelBubble) break;
+    var events = this.__events[event.type] || [];
+    for (var i = 0; i < events.length; ++i) {
+      events[i](event);
     }
-
-    if (false !== event.returnValue &&
-        'function' == typeof this.__events[event.type].defaultHandler)
-    {
-      this.__events[event.type].defaultHandler(event);
-    }
-  };
-
-  WebSocket.prototype.__handleMessages = function() {
-    // Gets data using readSocketData() instead of getting it from event object
-    // of Flash event. This is to make sure to keep message order.
-    // It seems sometimes Flash events don't arrive in the same order as they are sent.
-    var arr = this.__flash.readSocketData();
-    for (var i = 0; i < arr.length; i++) {
-      var data = decodeURIComponent(arr[i]);
-      try {
-        if (this.onmessage) {
-          var e;
-          if (window.MessageEvent) {
-            e = document.createEvent("MessageEvent");
-            e.initMessageEvent("message", false, false, data, null, null, window, null);
-          } else { // IE
-            e = {data: data};
-          }
-          this.onmessage(e);
-        }
-      } catch (e) {
-        console.error(e.toString());
-      }
-    }
+    var handler = this["on" + event.type];
+    if (handler) handler(event);
   };
 
   /**
-   * @param {object} object
-   * @param {string} type
+   * Handles an event from Flash.
+   * @param {Object} flashEvent
    */
-  WebSocket.prototype.__createEventHandler = function(object, type) {
-    return function(data) {
-      var event = new WebSocketEvent();
-      event.initEvent(type, true, true);
-      event.target = event.currentTarget = object;
-      for (var key in data) {
-        event[key] = data[key];
-      }
-      object.dispatchEvent(event, arguments);
-    };
-  }
+  WebSocket.prototype.__handleEvent = function(flashEvent) {
+    if ("readyState" in flashEvent) {
+      this.readyState = flashEvent.readyState;
+    }
+    if ("protocol" in flashEvent) {
+      this.protocol = flashEvent.protocol;
+    }
+    
+    var jsEvent;
+    if (flashEvent.type == "open" || flashEvent.type == "error") {
+      jsEvent = this.__createSimpleEvent(flashEvent.type);
+    } else if (flashEvent.type == "close") {
+      // TODO implement jsEvent.wasClean
+      jsEvent = this.__createSimpleEvent("close");
+    } else if (flashEvent.type == "message") {
+      var data = decodeURIComponent(flashEvent.message);
+      jsEvent = this.__createMessageEvent("message", data);
+    } else {
+      throw "unknown event type: " + flashEvent.type;
+    }
+    
+    this.dispatchEvent(jsEvent);
+  };
 
-  /**
-   * Basic implementation of {@link <a href="http://www.w3.org/TR/DOM-Level-2-Events/events.html#Events-interface">DOM 2 EventInterface</a>}
-   *
-   * @class
-   * @constructor
-   */
-  function WebSocketEvent(){}
-
-  /**
-   *
-   * @type boolean
-   */
-  WebSocketEvent.prototype.cancelable = true;
-
-  /**
-   *
-   * @type boolean
-   */
-  WebSocketEvent.prototype.cancelBubble = false;
-
-  /**
-   *
-   * @return void
-   */
-  WebSocketEvent.prototype.preventDefault = function() {
-    if (this.cancelable) {
-      this.returnValue = false;
+  WebSocket.prototype.__createSimpleEvent = function(type) {
+    if (document.createEvent && window.Event) {
+      var event = document.createEvent("Event");
+      event.initEvent(type, false, false);
+      return event;
+    } else {
+      return {type: type, bubbles: false, cancelable: false};
     }
   };
-
-  /**
-   *
-   * @return void
-   */
-  WebSocketEvent.prototype.stopPropagation = function() {
-    this.cancelBubble = true;
+  
+  WebSocket.prototype.__createMessageEvent = function(type, data) {
+    if (document.createEvent && window.MessageEvent && !window.opera) {
+      var event = document.createEvent("MessageEvent");
+      event.initMessageEvent("message", false, false, data, null, null, window, null);
+      return event;
+    } else {
+      // IE and Opera, the latter one truncates the data parameter after any 0x00 bytes.
+      return {type: type, data: data, bubbles: false, cancelable: false};
+    }
   };
-
+  
   /**
-   *
-   * @param {string} eventTypeArg
-   * @param {boolean} canBubbleArg
-   * @param {boolean} cancelableArg
-   * @return void
+   * Define the WebSocket readyState enumeration.
    */
-  WebSocketEvent.prototype.initEvent = function(eventTypeArg, canBubbleArg, cancelableArg) {
-    this.type = eventTypeArg;
-    this.cancelable = cancelableArg;
-    this.timeStamp = new Date();
-  };
-
-
   WebSocket.CONNECTING = 0;
   WebSocket.OPEN = 1;
   WebSocket.CLOSING = 2;
   WebSocket.CLOSED = 3;
 
+  WebSocket.__flash = null;
+  WebSocket.__instances = {};
   WebSocket.__tasks = [];
+  WebSocket.__nextId = 0;
+  
+  /**
+   * Load a new flash security policy file.
+   * @param {string} url
+   */
+  WebSocket.loadFlashPolicyFile = function(url){
+    WebSocket.__addTask(function() {
+      WebSocket.__flash.loadManualPolicyFile(url);
+    });
+  };
 
+  /**
+   * Loads WebSocketMain.swf and creates WebSocketMain object in Flash.
+   */
   WebSocket.__initialize = function() {
+    if (WebSocket.__flash) return;
+    
     if (WebSocket.__swfLocation) {
       // For backword compatibility.
       window.WEB_SOCKET_SWF_LOCATION = WebSocket.__swfLocation;
@@ -2097,29 +2336,70 @@ ASProxy.prototype =
     // See this article for hasPriority:
     // http://help.adobe.com/en_US/as3/mobile/WS4bebcd66a74275c36cfb8137124318eebc6-7ffd.html
     swfobject.embedSWF(
-      WEB_SOCKET_SWF_LOCATION, "webSocketFlash",
-      "1" /* width */, "1" /* height */, "9.0.0" /* SWF version */,
-      null, {bridgeName: "webSocket"}, {hasPriority: true, allowScriptAccess: "always"}, null,
+      WEB_SOCKET_SWF_LOCATION,
+      "webSocketFlash",
+      "1" /* width */,
+      "1" /* height */,
+      "10.0.0" /* SWF version */,
+      null,
+      null,
+      {hasPriority: true, swliveconnect : true, allowScriptAccess: "always"},
+      null,
       function(e) {
-        if (!e.success) console.error("[WebSocket] swfobject.embedSWF failed");
-      }
-    );
-    FABridge.addInitializationCallback("webSocket", function() {
-      try {
-        //console.log("[WebSocket] FABridge initializad");
-        WebSocket.__flash = FABridge.webSocket.root();
-        WebSocket.__flash.setCallerUrl(location.href);
-        WebSocket.__flash.setDebug(!!window.WEB_SOCKET_DEBUG);
-        for (var i = 0; i < WebSocket.__tasks.length; ++i) {
-          WebSocket.__tasks[i]();
+        if (!e.success) {
+          console.error("[WebSocket] swfobject.embedSWF failed");
         }
-        WebSocket.__tasks = [];
-      } catch (e) {
-        console.error("[WebSocket] " + e.toString());
-      }
-    });
+      });
   };
-
+  
+  /**
+   * Called by Flash to notify JS that it's fully loaded and ready
+   * for communication.
+   */
+  WebSocket.__onFlashInitialized = function() {
+    // We need to set a timeout here to avoid round-trip calls
+    // to flash during the initialization process.
+    setTimeout(function() {
+      WebSocket.__flash = document.getElementById("webSocketFlash");
+      WebSocket.__flash.setCallerUrl(location.href);
+      WebSocket.__flash.setDebug(!!window.WEB_SOCKET_DEBUG);
+      for (var i = 0; i < WebSocket.__tasks.length; ++i) {
+        WebSocket.__tasks[i]();
+      }
+      WebSocket.__tasks = [];
+    }, 0);
+  };
+  
+  /**
+   * Called by Flash to notify WebSockets events are fired.
+   */
+  WebSocket.__onFlashEvent = function() {
+    setTimeout(function() {
+      try {
+        // Gets events using receiveEvents() instead of getting it from event object
+        // of Flash event. This is to make sure to keep message order.
+        // It seems sometimes Flash events don't arrive in the same order as they are sent.
+        var events = WebSocket.__flash.receiveEvents();
+        for (var i = 0; i < events.length; ++i) {
+          WebSocket.__instances[events[i].webSocketId].__handleEvent(events[i]);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }, 0);
+    return true;
+  };
+  
+  // Called by Flash.
+  WebSocket.__log = function(message) {
+    console.log(decodeURIComponent(message));
+  };
+  
+  // Called by Flash.
+  WebSocket.__error = function(message) {
+    console.error(decodeURIComponent(message));
+  };
+  
   WebSocket.__addTask = function(task) {
     if (WebSocket.__flash) {
       task();
@@ -2128,30 +2408,31 @@ ASProxy.prototype =
     }
   };
   
+  /**
+   * Test if the browser is running flash lite.
+   * @return {boolean} True if flash lite is running, false otherwise.
+   */
   WebSocket.__isFlashLite = function() {
-    if (!window.navigator || !window.navigator.mimeTypes) return false;
+    if (!window.navigator || !window.navigator.mimeTypes) {
+      return false;
+    }
     var mimeType = window.navigator.mimeTypes["application/x-shockwave-flash"];
-    if (!mimeType || !mimeType.enabledPlugin || !mimeType.enabledPlugin.filename) return false;
+    if (!mimeType || !mimeType.enabledPlugin || !mimeType.enabledPlugin.filename) {
+      return false;
+    }
     return mimeType.enabledPlugin.filename.match(/flashlite/i) ? true : false;
   };
-
-  // called from Flash
-  window.webSocketLog = function(message) {
-    console.log(decodeURIComponent(message));
-  };
-
-  // called from Flash
-  window.webSocketError = function(message) {
-    console.error(decodeURIComponent(message));
-  };
-
+  
   if (!window.WEB_SOCKET_DISABLE_AUTO_INITIALIZATION) {
     if (window.addEventListener) {
-      window.addEventListener("load", WebSocket.__initialize, false);
+      window.addEventListener("load", function(){
+        WebSocket.__initialize();
+      }, false);
     } else {
-      window.attachEvent("onload", WebSocket.__initialize);
+      window.attachEvent("onload", function(){
+        WebSocket.__initialize();
+      });
     }
   }
   
 })();
-

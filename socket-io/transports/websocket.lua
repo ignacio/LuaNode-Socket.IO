@@ -49,7 +49,24 @@ function WebSocket:_onConnect (req, socket)
 	local location = ((origin and origin:match('^https')) and 'wss' or 'ws')
 						.. '://' .. self.request.headers.host .. self.request.url
 	
+	self.waitingForNonce = false
 	if self.request.headers['sec-websocket-key1'] then
+		--[[  We need to send the 101 response immediately when using Draft 76 with
+		a load balancing proxy, such as HAProxy.  In order to protect an
+		unsuspecting non-websocket HTTP server, HAProxy will not send the
+		8-byte nonce through the connection until the Upgrade: WebSocket
+		request has been confirmed by the WebSocket server by a 101 response
+		indicating that the server can handle the upgraded protocol.  We
+		therefore must send the 101 response immediately, and then wait for
+		the nonce to be forwarded to us afterward in order to finish the
+		Draft 76 handshake.
+		--]]
+		
+		-- If we don't have the nonce yet, wait for it.
+		if (not self.upgradeHead and #self.upgradeHead >= 8) then
+			self.waitingForNonce = true
+		end
+				
 		headers = {
 			'HTTP/1.1 101 WebSocket Protocol Handshake',
 			'Upgrade: WebSocket',
@@ -80,14 +97,39 @@ function WebSocket:_onConnect (req, socket)
 	self.connection:setTimeout(0)
 	self.connection:setNoDelay(true)
 	self.connection:setEncoding('utf-8')
-  
+	
+	if self.waitingForNonce then
+		-- Since we will be receiving the binary nonce through the normal HTTP
+		-- data event, set the connection to 'binary' temporarily
+		self.connection:setEncoding("binary")
+		self._headers = headers
+	else
+		if self:_proveReception(headers) then
+			self:_payload()
+		end
+	end
+	
+	self.buffer = "";
+	
 	self.connection:addListener('data', function(self_, data)
+		if self.waitingForNonce then
+			self.buffer = self.buffer .. data
+			
+			if #self.buffer < 8 then return end
+			-- Restore the connection to utf8 encoding after receiving the nonce
+			self.connection:setEncoding("utf8")
+			self.waitingForNonce = false
+			-- Stuff the nonce into the location where it's expected to be
+			self.upgradeHead = self.buffer:sub(0, 8)
+			self.buffer = ""
+			if self:_proveReception(headers) then
+				self:_payload()
+			end
+			return
+		end
+		
 		self.parser:add(data)
 	end)
-
-	if self:_proveReception(headers) then
-		self:_payload()
-	end
 end
 
 -- Two helper functions for websocket's handshake

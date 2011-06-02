@@ -119,30 +119,46 @@ end
 --
 --
 function Client:_onConnect (req, res)
- 	self.request = req
+	local attachConnection = not self.connection
+ 	
+	self.request = req
 	self.response = res
 	self.connection = req.connection
-	  
-	self.connection:addListener('end', function()
-		self:_onClose()
-	end)
-	  
-	if req then
-		req:addListener('error', function(self, err)
-			if req.finish then req:finish() end
-			if req.destroy then req:destroy() end
-		end)
-		if res then
-			res:addListener('error', function(self, err)
-				if res.finish then res:finish() end
-				if res.destroy then res:destroy() end
-			end)
+	
+	if not attachConnection then
+		attachConnetion = (not attachConnection and not self.connection.eventsAttached) -- <-- nuevo
+	end
+	self.connection.eventsAttached = true
+	
+	if attachConnection then
+		local function destroyConnection()
+			self:_onClose()
+			if self.connection then
+				self.connection:destroy()
+			end
 		end
-		req.connection:addListener('error', function(self, err)
-			if req.connection.finish then req.connection:finish() end
-			if req.connection.destroy then req.connection:destroy() end
-		end)
-		
+		self.connection:addListener("end", destroyConnection)
+		self.connection:addListener("timeout", destroyConnection)
+		self.connection:addListener("error", destroyConnection)
+	end
+	
+	if req then
+		local function destroyRequest()
+			if req.destroy then
+				req:destroy()
+			end
+		end
+		req:addListener("error", destroyRequest)
+		req:addListener("timeout", destroyRequest)
+		if res then
+			local function destroyResponse()
+				if res.destroy then
+					res:destroy()
+				end
+			end
+			res:addListener("error", destroyResponse)
+			res:addListener("timeout", destroyResponse)
+		end
 		if self._disconnectTimeout then
 			clearTimeout(self._disconnectTimeout)
 		end
@@ -206,15 +222,12 @@ end
 --
 --
 function Client:_onClose (skipDisconnect)
-	
+	if not self._open then
+		return self
+	end	
 	if self._heartbeatInterval then clearTimeout(self._heartbeatInterval) end
 	if self._heartbeatTimeout then clearTimeout(self._heartbeatTimeout) end
 	self._open = false
-	if self.connection then
-		self.connection:finish()
-		self.connection:destroy()
-		self.connection = nil
-	end
 	self.request = nil
 	self.response = nil
 	if skipDisconnect ~= false then

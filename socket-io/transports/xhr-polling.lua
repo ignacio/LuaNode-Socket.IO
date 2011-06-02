@@ -26,7 +26,7 @@ end
 
 function Polling:_onConnect (req, res)
 	local body = ''
-
+	
 	if req.method == "GET" then
 		Client._onConnect(self, req, res)
 		
@@ -41,16 +41,18 @@ function Polling:_onConnect (req, res)
 		end)
 		req:on('end', function()
 			local headers = { ['Content-Type'] = 'text/plain' }
-			if self:_verifyOrigin(req.headers.origin) then
-				headers['Access-Control-Allow-Origin'] = '*'
-				if req.headers.cookie then
-					headers['Access-Control-Allow-Credentials'] = 'true'
+			if req.headers.origin then
+				if self:_verifyOrigin(req.headers.origin) then
+					headers['Access-Control-Allow-Origin'] = '*'
+					if req.headers.cookie then
+						headers['Access-Control-Allow-Credentials'] = 'true'
+					end
+				else
+					res:writeHead(401)
+					res:write('unauthorized')
+					res:finish()
+					return
 				end
-			else
-				res:writeHead(401)
-				res:write('unauthorized')
-				res:finish()
-				return
 			end
 			--try {
 				-- optimization: just strip first 5 characters here?
@@ -61,6 +63,26 @@ function Polling:_onConnect (req, res)
 			res:write('ok')
 			res:finish()
 		end)
+	elseif req.method == "OPTIONS" then
+		local headers = { ['Content-Type'] = 'text/plain' }
+		if req.headers.origin then
+			if self:_verifyOrigin(req.headers.origin) then
+				headers['Access-Control-Allow-Origin'] = '*'
+				if req.headers.cookie then
+					headers['Access-Control-Allow-Credentials'] = 'true'
+				end
+				headers['Access-Control-Allow-Methods'] = "POST, GET, OPTIONS"
+				headers['Access-Control-Max-Age'] = tostring(1728000)	-- toma! por 20 dias no jorobes
+			else
+				res:writeHead(401)
+				res:write('unauthorized')
+				res:finish()
+				return
+			end
+		end
+		res:writeHead(200, headers)
+		res:write('ok')
+		res:finish()
 	end
 end
 

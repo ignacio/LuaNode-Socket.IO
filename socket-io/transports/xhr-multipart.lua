@@ -43,7 +43,6 @@ function Multipart:_onConnect (req, res)
 	
 	if req.method == "GET" then
 		Client._onConnect(self, req, res)
-		
 		headers['Content-Type'] = 'multipart/x-mixed-replace;boundary="socketio"'
 		headers['Connection'] = 'keep-alive'
 		self.request.connection:addListener('end', function()
