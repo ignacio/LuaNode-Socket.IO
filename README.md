@@ -23,7 +23,20 @@ You'll also need some Json library for Lua. [LuaJSON][4] or [Json4Lua][5] are re
 And also:
 
   - luarocks install luuid
-  - luarocks install bitop
+  - luarocks install luabitop
+  
+If luuid gives you trouble to install (especially on MacOSX), you might try the following:
+
+  - Download and extract [e2fsprogs](http://prdownloads.sourceforge.net/e2fsprogs/e2fsprogs-1.41.12.tar.gz)
+  - cd e2fsprogs-1.41.12
+  - ./configure
+  - cd lib/uuid
+  - make
+  - ./tst_uuid
+  - cp uuid.so /usr/local/lib/lua/5.1/
+
+or read [this post](http://li9lo54.tumblr.com/tir_on_mac_workaround).
+
 
 ## Documentation #
 The usage is the same as [Socket.IO-node][6].
