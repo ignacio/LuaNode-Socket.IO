@@ -784,16 +784,30 @@ io.data.decodeMessage = function(msg){
 		var self = this;
 		this._posting = true;
 		this._sendXhr = this._request('send', 'POST');
-		this._sendXhr.onreadystatechange = function(){
-			var status;
-			if (self._sendXhr.readyState == 4){
-				self._sendXhr.onreadystatechange = empty;
-				try { status = self._sendXhr.status; } catch(e){}
+		if (window.XDomainRequest) {
+			this._sendXhr.onload = function(){
+				self._sendXhr.onload = self._sendXhr.onerror = empty;
 				self._posting = false;
-				if (status == 200){
-					self._checkSend();
-				} else {
-					self._onDisconnect();
+				self._checkSend();
+			};
+			this._sendXhr.onerror = function() {
+				self._sendXhr.onload = self._sendXhr.onerror = empty;
+				self._posting = false;
+				self._onDisconnect();
+			}
+		}
+		else {
+			this._sendXhr.onreadystatechange = function(){
+				var status;
+				if (self._sendXhr.readyState == 4){
+					self._sendXhr.onreadystatechange = empty;
+					try { status = self._sendXhr.status; } catch(e){}
+					self._posting = false;
+					if (status == 200){
+						self._checkSend();
+					} else {
+						self._onDisconnect();
+					}
 				}
 			}
 		};
@@ -1362,16 +1376,28 @@ io.data.decodeMessage = function(msg){
 	XHRPolling.prototype._get = function(){
 		var self = this;
 		this._xhr = this._request(+ new Date, 'GET');
-		this._xhr.onreadystatechange = function(){
-			var status;
-			if (self._xhr.readyState == 4){
-				self._xhr.onreadystatechange = empty;
-				try { status = self._xhr.status; } catch(e){}
-				if (status == 200){
-					self._onData(self._xhr.responseText);
-					self._get();
-				} else {
-					self._onDisconnect();
+		if (window.XDomainRequest) {
+			this._xhr.onload = function(){
+				self._xhr.onload = self._xhr.onerror = empty;
+				self._onData(self._xhr.responseText);
+				self._get();
+			};
+			this._xhr.onerror = function() {
+				self._xhr.onload = self._xhr.onerror = empty;
+				self._onDisconnect();
+			}
+		} else {
+			this._xhr.onreadystatechange = function(){
+				var status;
+				if (self._xhr.readyState == 4){
+					self._xhr.onreadystatechange = empty;
+					try { status = self._xhr.status; } catch(e){}
+					if (status == 200){
+						self._onData(self._xhr.responseText);
+						self._get();
+					} else {
+						self._onDisconnect();
+					}
 				}
 			}
 		};
