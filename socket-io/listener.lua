@@ -229,6 +229,7 @@ end
 
 function Listener:_onConnection (transport, req, res, httpUpgrade, head)
 	self.options.log('Initializing client with transport "' .. transport .. '" on ' .. os.date("%Y-%m-%d %H:%M:%S"))
+	req.socket:setTimeout(0) -- luanode.http closes the connection using a two second timeout
 	transports[transport](self, req, res, self.options.transportOptions[transport], head)
 end
 
