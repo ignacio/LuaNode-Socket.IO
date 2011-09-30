@@ -11,11 +11,7 @@ HTMLFile.__type = "socket-io.HTMLFile"
 
 
 function HTMLFile:__init (...)
-	local newClient = Class.construct(HTMLFile, ...)
-	
-	newClient:__afterConstruct(...)
-	
-	return newClient
+	return Class.construct(HTMLFile, ...)
 end
 
 function HTMLFile:_onConnect (req, res)

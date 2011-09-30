@@ -4,12 +4,13 @@ local WebSocket = require "socket-io.transports.websocket"
 local listeners = {}
 local netserver
 
+
 Flashsocket = Class.InheritsFrom(WebSocket)
 Flashsocket.__type = "socket-io.Flashsocket"
 
 Flashsocket.httpUpgrade = true
 
-local function policy(listeners)
+local function policy (listeners)
 	local xml = [[
 <?xml version="1.0"?>
 <!DOCTYPE cross-domain-policy SYSTEM  "http://www.macromedia.com/xml/dtds/cross-domain-policy.dtd">
@@ -35,6 +36,9 @@ local function policy(listeners)
 	return xml
 end
 
+function Flashsocket:__init (...)
+	return Class.construct(Flashsocket, ...)
+end
 
 function Flashsocket.init (listener)
 	table.insert(listeners, listener)

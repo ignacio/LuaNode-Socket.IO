@@ -11,9 +11,9 @@ local Client = require "socket-io.client"
 local clientVersion = "0.7pre"	-- esto sale de D:\Desarrollo\socket.io-node\support\socket.io-client\lib\io.js (version)
 
 local transports = {
-	flashsocket = require("socket-io.transports.flashsocket"),
+	--flashsocket = require("socket-io.transports.flashsocket"),
 	--htmlfile = require("socket-io.transports.htmlfile"),
-	websocket = require("socket-io.transports.websocket"),
+	--websocket = require("socket-io.transports.websocket"),
 	["xhr-multipart"] = require("socket-io.transports.xhr-multipart"),
 	["xhr-polling"] = require("socket-io.transports.xhr-polling"),
 	--["jsonp-polling"] = require("socket-io.transports.jsonp-polling")
@@ -28,6 +28,7 @@ local m_socketio_resources_path = Path.join(debug.getinfo(1, "S").source:match("
 Listener = Class.InheritsFrom(EventEmitter)
 
 function Listener:__init (server, options)
+
 	local newListener = Class.construct(Listener)
 	
 	newListener.server = server
@@ -212,7 +213,7 @@ end
 
 function Listener:_onClientConnect (client)
 	self.clients[client.sessionId] = client
-	self.options.log('Client ' .. client.sessionId .. ' connected on ' .. os.date("%Y-%m-%d %H:%M:%S"))
+	self.options.log("Client %s (%s) connected on %s", client.sessionId, client.__type, os.date("%Y-%m-%d %H:%M:%S"))
 	self:emit('clientConnect', client)
 	self:emit('connection', client)
 end
@@ -223,14 +224,17 @@ end
 
 function Listener:_onClientDisconnect (client)
 	self.clients[client.sessionId] = nil
-	self.options.log('Client ' .. client.sessionId .. ' disconnected on ' .. os.date("%Y-%m-%d %H:%M:%S"))
+	self.options.log("Client %s (%s) disconnected on %s", client.sessionId, client.__type, os.date("%Y-%m-%d %H:%M:%S"))
 	self:emit('clientDisconnect', client)
 end
 
+---
+-- @transport a string with the transport type (i.e. websocket, xhr.polling, etc)
 function Listener:_onConnection (transport, req, res, httpUpgrade, head)
 	self.options.log('Initializing client with transport "' .. transport .. '" on ' .. os.date("%Y-%m-%d %H:%M:%S"))
-	req.socket:setTimeout(0) -- luanode.http closes the connection using a two second timeout
-	transports[transport](self, req, res, self.options.transportOptions[transport], head)
+	req.socket:setTimeout(0) -- Disable timeout, or the connection will close in two minutes
+	local transport = transports[transport](self, req, res, self.options.transportOptions[transport], head)
+	transport:__afterConstruct(self, req, res, self.options.transportOptions[transport], head)
 end
 
 

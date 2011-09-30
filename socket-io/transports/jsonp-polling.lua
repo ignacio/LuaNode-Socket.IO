@@ -11,11 +11,7 @@ JSONPPolling.__type = "socket-io.JSONPPolling"
 
 
 function JSONPPolling:__init (...)
-	local newClient = Class.construct(JSONPPolling, ...)
-	
-	newClient:__afterConstruct(...)
-	
-	return newClient
+	return Class.construct(JSONPPolling, ...)
 end
 
 function JSONPPolling:getOptions ()

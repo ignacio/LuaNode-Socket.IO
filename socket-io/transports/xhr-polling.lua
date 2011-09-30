@@ -5,15 +5,12 @@ local options = require "socket-io.utils".options
 local merge = require "socket-io.utils".merge
 local null_option = require "socket-io.utils".null_option
 
+
 Polling = Class.InheritsFrom(Client)
 Polling.__type = "socket-io.Polling"
 
 function Polling:__init (...)
-	local newClient = Class.construct(Polling, ...)
-	
-	newClient:__afterConstruct(...)
-	
-	return newClient
+	return Class.construct(Polling, ...)
 end
 
 function Polling:getOptions ()

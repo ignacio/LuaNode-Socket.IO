@@ -4,22 +4,12 @@ local qs = require "luanode.querystring"
 local options = require "socket-io.utils".options
 local merge = require "socket-io.utils".merge
 
---[[
-var Multipart = module.exports = function(){
-  Client.apply(this, arguments);
-};
 
-require('sys').inherits(Multipart, Client);
---]]
 Multipart = Class.InheritsFrom(Client)
 Multipart.__type = "socket-io.Multipart"
 
 function Multipart:__init (...)
-	local newClient = Class.construct(Multipart, ...)
-	
-	newClient:__afterConstruct(...)
-	
-	return newClient
+	return Class.construct(Multipart, ...)
 end
 
 function Multipart:_onConnect (req, res)

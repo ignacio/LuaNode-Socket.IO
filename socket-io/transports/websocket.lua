@@ -14,11 +14,7 @@ WebSocket = Class.InheritsFrom(Client)
 WebSocket.__type = "socket-io.WebSocket"
 
 function WebSocket:__init (...)
-	local newClient = Class.construct(WebSocket, ...)
-	
-	newClient:__afterConstruct(...)
-	
-	return newClient
+	return Class.construct(WebSocket, ...)
 end
 
 function WebSocket:_onConnect (req, socket)
@@ -34,6 +30,7 @@ function WebSocket:_onConnect (req, socket)
 		return self:_onData(...)
 	end)
 	self.parser:on('error', function(emitter, ...)
+		self.listener.options.log(...)
 		return self:_onClose(...)
 	end)
 
@@ -202,27 +199,22 @@ function Parser:__init ()
 end
 
 function Parser:add (data)
-	--console.warn("Parser.add", Utils.DumpDataInHex(data))
 	self.buffer = self.buffer .. data
 	self:parse()
 end
 
 function Parser:parse ()
-	--console.log("Parser.parse", Utils.DumpDataInHex(self.buffer) )
 	for i = self.i, #self.buffer do
 		local chr = self.buffer:sub(i, i)
 		if i == 1 then
 			if chr ~= '\0' then
-				console.warn( Utils.DumpDataInHex(self.buffer) )
-				self:error('Bad framing. Expected null byte as first frame')
+				self:error('Bad framing. Expected null byte as first frame.\n' .. Utils.DumpDataInHex(self.buffer))
 			end
 		else
 			if chr == '\255' then
 				local data = self.buffer:sub(2, i - 1)
-				--console.warn("Parser:parse '%s'", data)
-				self:emit('data', data )
+				self:emit('data', data)
 				self.buffer = self.buffer:sub(i + 1)
-				--console.warn( Utils.DumpDataInHex(self.buffer) )
 				self.i = 1
 				return self:parse()
 			end
@@ -233,7 +225,7 @@ end
 function Parser:error (reason)
 	self.buffer = ''
 	self.i = 1
-	console.error("Bad framing. Expected null byte as first frame")
+	--console.error("Bad framing. Expected null byte as first frame")
 	self:emit('error', reason)
 	return self
 end
