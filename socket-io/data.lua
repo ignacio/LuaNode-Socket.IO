@@ -68,7 +68,7 @@ function Decoder:parse ()
 		elseif charCount == self.length then
 			if chr == ',' then
 				self:emit('data', self.type, self.data)
-				self.buffer = self.buffer:sub(self.i + 1)
+				self.buffer = self.buffer:sub(self.i)
 				self:reset()
 				return self:parse()
 			else
