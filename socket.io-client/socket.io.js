@@ -784,7 +784,7 @@ io.data.decodeMessage = function(msg){
 		var self = this;
 		this._posting = true;
 		this._sendXhr = this._request('send', 'POST');
-		if (window.XDomainRequest) {
+		if (window.XDomainRequest && this._sendXhr instanceof XDomainRequest) {
 			this._sendXhr.onload = function(){
 				self._sendXhr.onload = self._sendXhr.onerror = empty;
 				self._posting = false;
@@ -1376,7 +1376,7 @@ io.data.decodeMessage = function(msg){
 	XHRPolling.prototype._get = function(){
 		var self = this;
 		this._xhr = this._request(+ new Date, 'GET');
-		if (window.XDomainRequest) {
+		if (window.XDomainRequest && this._xhr instanceof XDomainRequest) {
 			this._xhr.onload = function(){
 				self._xhr.onload = self._xhr.onerror = empty;
 				self._onData(self._xhr.responseText);
