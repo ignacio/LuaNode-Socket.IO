@@ -51,11 +51,15 @@ function Polling:_onConnect (req, res)
 					return
 				end
 			end
-			--try {
-				-- optimization: just strip first 5 characters here?
+			local ok, err = pcall(function()
+				-- the request is application/x-www-form-urlencoded, so we need to decode first
 				local msg = qs.parse(body)
 				self:_onData(msg.data)
-			--} catch(e){}
+			end)
+			if not ok then
+				-- TODO: proper logging
+				console.trace("%s", err)
+			end
 			res:writeHead(200, headers)
 			res:write('ok')
 			res:finish()

@@ -53,10 +53,15 @@ function Multipart:_onConnect (req, res)
 			body = body .. tostring(message)
 		end)
 		req:addListener('end', function()
-			--try {
+			local ok, err = pcall(function()
+				-- the request is application/x-www-form-urlencoded, so we need to decode first
 				local msg = qs.parse(body)
 				self:_onData(msg.data)
-			--} catch(e){}
+			end)
+			if not ok then
+				-- TODO: proper logging
+				console.trace("%s", err)
+			end
 			res:writeHead(200, headers)
 			res:write('ok')
 			res:finish()
