@@ -126,7 +126,7 @@ function Listener:check (req, res, httpUpgrade, head)
 			return true
 		end
 		if not transports[parts[1]] then
-			self.options.log("no transport for " .. parts[1])
+			self.options.log("no transport for '%s'", parts[1])
 			return false
 		end
 		if parts[2] and parts[2] ~= "" then
@@ -136,7 +136,7 @@ function Listener:check (req, res, httpUpgrade, head)
 			else
 				req.connection:finish()
 				req.connection:destroy()
-				self.options.log('Couldnt find client with session id "' .. parts[2] .. '"')
+				self.options.log("Couldn't find client with session id '%s'", parts[2])
 			end
 		else
 			self:_onConnection(parts[1], req, res, httpUpgrade, head)
@@ -231,7 +231,7 @@ end
 ---
 -- @transport a string with the transport type (i.e. websocket, xhr.polling, etc)
 function Listener:_onConnection (transport, req, res, httpUpgrade, head)
-	self.options.log('Initializing client with transport "' .. transport .. '" on ' .. os.date("%Y-%m-%d %H:%M:%S"))
+	self.options.log("Initializing client with transport '%s' on '%s'",  transport, os.date("%Y-%m-%d %H:%M:%S"))
 	req.socket:setTimeout(0) -- Disable timeout, or the connection will close in two minutes
 	local transport = transports[transport](self, req, res, self.options.transportOptions[transport], head)
 	transport:__afterConstruct(self, req, res, self.options.transportOptions[transport], head)

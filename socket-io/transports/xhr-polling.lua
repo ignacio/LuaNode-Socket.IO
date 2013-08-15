@@ -27,6 +27,7 @@ function Polling:_onConnect (req, res)
 	if req.method == "GET" then
 		Client._onConnect(self, req, res)
 		
+		-- TODO: podria levantar el timer solo si no habia datos para responder enseguida
 		self._closeTimeout = setTimeout(function()
 			self:_write('')
 		end, self.options.duration)

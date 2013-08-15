@@ -61,7 +61,7 @@ function Flashsocket.init (listener)
   
 	if listener.options.flashPolicyServer and not netserver then
 		netserver = net.createServer(function(self, socket)
-			listener.options.log("lnsocket.io: connection on flash port")
+			listener.options.log("connection on flash port")
 			socket:addListener('error', function(self, err)
 				if socket and socket.finish then
 					socket:finish()
